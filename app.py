@@ -465,12 +465,31 @@ def register():
              now, hide_photo)
         )
         db.commit()
+        # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页
+        if request.headers.get("X-Requested-With") == "fetch" or \
+           request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
+            new_item = db.execute(
+                "SELECT * FROM items WHERE code=?", (code,)
+            ).fetchone()
+            return jsonify({"ok": True, "item": dict(new_item)})
+        # 传统整页提交（独立登记页）：保持原行为
         flash(f"登记成功！失物编号：{code}", "success")
         return redirect(url_for("register"))
 
     # GET：带一个默认时间
     default_time = datetime.now().strftime("%Y-%m-%dT%H:%M")
     return render_template("register.html", default_time=default_time)
+
+
+@app.route("/api/pending")
+@login_required
+def pending_api():
+    """返回最新待认领列表（工作台登记成功后局部刷新用）。"""
+    db = get_db()
+    items = db.execute(
+        "SELECT * FROM items WHERE status='待认领' ORDER BY id DESC LIMIT 10"
+    ).fetchall()
+    return jsonify({"ok": True, "items": [dict(r) for r in items]})
 
 
 # ============================================================

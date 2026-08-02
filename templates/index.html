@@ -40,7 +40,7 @@
             <button class="drawer-close" onclick="tryCloseDrawer('register')">×</button>
         </div>
         <div class="drawer-body">
-            <form method="post" action="{{ url_for('register') }}" enctype="multipart/form-data" id="regDrawerForm">
+            <form id="regDrawerForm" onsubmit="submitRegister(event)">
                 <div class="form-group" style="margin-bottom:14px;">
                     <label>物品名称 <span class="req">*</span></label>
                     <input type="text" name="name" class="form-control" placeholder="如：黑色钱包" required>
@@ -133,10 +133,13 @@
     </div>
 </div>
 
+<!-- 登记成功提醒（自动15秒消失）-->
+<div id="regNotice" class="flash success" style="display:none;margin-bottom:16px;"></div>
+
 <div class="card">
-    <h2>待认领清单（最近 {{ pending_items|length }} 件）</h2>
-    {% if pending_items %}
-    <div class="item-list">
+    <h2>待认领清单（最近 <span id="pendingCount">{{ pending_items|length }}</span> 件）</h2>
+    <div id="pendingList" class="item-list">
+        {% if pending_items %}
         {% for it in pending_items %}
         <div class="item-row" onclick="openClaimForCode('{{ it.code }}')">
             {% if it.photo %}
@@ -158,15 +161,116 @@
             </div>
         </div>
         {% endfor %}
+        {% else %}
+        <div class="empty" id="pendingEmpty">🎉 暂无待认领物品</div>
+        {% endif %}
     </div>
-    {% else %}
-    <div class="empty">🎉 暂无待认领物品</div>
-    {% endif %}
 </div>
 {% endblock %}
 
 {% block script %}
 <script>
+/* ===== 拾物登记 AJAX 提交（不跳大屏，留工作台弹提醒）===== */
+function submitRegister(e){
+    e.preventDefault();  // 阻止默认整页提交
+    var form = document.getElementById('regDrawerForm');
+    var fd = new FormData(form);
+    // 用原始字段名提交，后端 register 视图照常处理；标记为AJAX返回JSON
+    fetch("{{ url_for('register') }}", {
+        method:'POST', body: fd,
+        headers: {'X-Requested-With': 'fetch'}
+    })
+        .then(function(r){return r.json();})
+        .then(function(data){
+            if(!data.ok){
+                toast(data.msg || '登记失败，请检查必填项', 'error');
+                return;
+            }
+            // 成功：清空表单、关抽屉、刷新列表、弹提醒
+            form.reset();
+            formDirty.register = false;
+            closeDrawer('register');
+            refreshPending();
+            showRegNotice(data.item);
+        })
+        .catch(function(){
+            toast('网络错误，请重试', 'error');
+        });
+}
+
+/* 拉取最新待认领列表并局部刷新 */
+function refreshPending(){
+    fetch("{{ url_for('pending_api') }}")
+        .then(function(r){return r.json();})
+        .then(function(data){
+            if(!data.ok) return;
+            var box = document.getElementById('pendingList');
+            document.getElementById('pendingCount').textContent = data.items.length;
+            if(data.items.length === 0){
+                box.innerHTML = '<div class="empty" id="pendingEmpty">🎉 暂无待认领物品</div>';
+                return;
+            }
+            var html = '';
+            data.items.forEach(function(it){
+                var photo = it.photo
+                    ? '<img class="thumb" src="/uploads/'+it.photo+'">'
+                    : '<div class="thumb-placeholder">📦</div>';
+                html += '<div class="item-row" onclick="openClaimForCode(\''+it.code+'\')">'+
+                    photo+
+                    '<div class="info"><div class="code">编号 '+it.code+'</div>'+
+                    '<div class="name">'+escapeHtml(it.name)+'　<span class="tag tag-pending">待认领</span></div>'+
+                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'地点未填')+' · 捡到 '+(it.found_time||(it.created_at||'').slice(0,10))+'</div></div>'+
+                    '<div class="actions"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();openClaimForCode(\''+it.code+'\')">去认领</button></div>'+
+                    '</div>';
+            });
+            box.innerHTML = html;
+        });
+}
+
+/* 登记成功提醒（15秒自动消失）*/
+var _regNoticeTimer = null;
+function showRegNotice(item){
+    var box = document.getElementById('regNotice');
+    box.innerHTML = '✓ 登记成功！编号 <strong>'+item.code+'</strong>　'+escapeHtml(item.name)+
+        '　<a href="javascript:viewItemDetail('+item.id+')" style="color:#1f5d75;text-decoration:underline;">查看详细</a>';
+    box.style.display = 'block';
+    // 滚动到提醒可见
+    box.scrollIntoView({behavior:'smooth', block:'center'});
+    // 15秒后消失
+    if(_regNoticeTimer) clearTimeout(_regNoticeTimer);
+    _regNoticeTimer = setTimeout(function(){
+        box.style.transition = 'opacity .5s';
+        box.style.opacity = '0';
+        setTimeout(function(){ box.style.display='none'; box.style.opacity='1'; }, 500);
+    }, 15000);
+}
+
+/* 查看刚登记物品的详情 */
+function viewItemDetail(id){
+    fetch("/api/item/"+id).then(function(r){return r.json();})
+        .then(function(data){
+            if(!data.ok){ toast('读取失败','error'); return; }
+            var it = data.item;
+            var photoHtml = it.photo
+                ? '<img class="photo-big" src="/uploads/'+it.photo+'">'
+                : '<div style="color:#999;margin:10px 0;">（无照片）</div>';
+            var html =
+                '<div class="detail-panel" style="margin:0;">'+
+                '<div><span class="code">编号 '+it.code+'</span>'+
+                '<span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>'+
+                '<div style="font-size:20px;font-weight:600;margin:6px 0;">'+escapeHtml(it.name)+'</div>'+
+                photoHtml+
+                '<div class="detail-grid">'+
+                '<div><span class="k">类别：</span><span class="v">'+escapeHtml(it.category||'—')+'</span></div>'+
+                '<div><span class="k">捡到地点：</span><span class="v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+                '<div><span class="k">捡到时间：</span><span class="v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
+                '<div><span class="k">捡到人：</span><span class="v">'+escapeHtml(it.founder||'—')+'</span></div>'+
+                '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">'+escapeHtml(it.description||'—')+'</span></div>'+
+                '</div></div>';
+            openModal(html);
+        });
+}
+
 /* ===== 抽屉开关 + 误触保护 ===== */
 // 记录表单是否有改动
 var formDirty = {register: false, claim: false};
