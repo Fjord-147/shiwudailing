@@ -23,7 +23,8 @@ COLUMNS = [
     ("feature_verified", "特征已核实"),
     ("claimed_at", "认领时间"),
     ("operator", "经办人"),
-    ("photo", "照片文件名"),
+    ("photo", "物品照片"),
+    ("claimer_photo", "认领人照片"),
 ]
 
 
@@ -57,7 +58,7 @@ def export_items_to_excel(items):
         ws.append(line)
 
     # 列宽
-    widths = [14, 16, 12, 30, 14, 16, 10, 10, 18, 12, 14, 10, 18, 10, 24]
+    widths = [14, 16, 12, 30, 14, 16, 10, 10, 18, 12, 14, 10, 18, 10, 24, 24]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 

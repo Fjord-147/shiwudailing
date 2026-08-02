@@ -135,6 +135,10 @@ function showDetail(itemId) {
                   '认领时间：' + (it.claimed_at || "") + '　' +
                   '经办人：' + (it.operator || "") + '<br>' +
                   '特征已核实：' + (it.feature_verified ? "是" : "否") +
+                  (it.claimer_photo
+                      ? '<br><span class="k">认领人照片：</span><br>' +
+                        '<img src="/uploads/' + it.claimer_photo + '" style="max-width:140px;max-height:140px;border-radius:6px;margin-top:4px;border:1px solid #e2e8f0;">'
+                      : '') +
                   '</div>'
                 : "";
             var html =

@@ -75,13 +75,16 @@ def init_db():
             feature_verified INTEGER DEFAULT 0,    -- 特征已核实 0/1
             claimed_at     TEXT,                   -- 认领时间
             operator       TEXT,                   -- 经办人
-            hide_photo     INTEGER DEFAULT 0       -- 1=敏感物品，公众界面隐藏照片
+            hide_photo     INTEGER DEFAULT 0,      -- 1=敏感物品，公众界面隐藏照片
+            claimer_photo  TEXT                    -- 认领人照片（可选，老人等记不清电话时备查）
         )
     """)
-    # 兼容旧库：若表已存在但没有 hide_photo 字段，自动补上
+    # 兼容旧库：若表已存在但缺字段，自动补上
     cols = [r[1] for r in conn.execute("PRAGMA table_info(items)").fetchall()]
     if "hide_photo" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN hide_photo INTEGER DEFAULT 0")
+    if "claimer_photo" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN claimer_photo TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -110,6 +113,11 @@ def init_db():
 # ============================================================
 # 登录 / 口令
 # ============================================================
+def _is_ajax():
+    """判断是否为前端 fetch（AJAX）请求，决定返回 JSON 还是重定向。"""
+    return request.headers.get("X-Requested-With") == "fetch"
+
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -466,8 +474,7 @@ def register():
         )
         db.commit()
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页
-        if request.headers.get("X-Requested-With") == "fetch" or \
-           request.accept_mimetypes.accept_json and not request.accept_mimetypes.accept_html:
+        if _is_ajax():
             new_item = db.execute(
                 "SELECT * FROM items WHERE code=?", (code,)
             ).fetchone()
@@ -510,27 +517,53 @@ def claim():
 
         item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
         if not item:
-            flash("物品不存在。", "error")
-            return redirect(url_for("claim"))
+            msg = "物品不存在。"
+            if _is_ajax(): return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error"); return redirect(url_for("claim"))
         if item["status"] == "已认领":
-            flash("该物品已被认领。", "error")
-            return redirect(url_for("claim"))
+            msg = "该物品已被认领。"
+            if _is_ajax(): return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error"); return redirect(url_for("claim"))
         if not claimer_name:
-            flash("请填写认领人姓名。", "error")
-            return redirect(url_for("claim", code=item["code"]))
+            msg = "请填写认领人姓名。"
+            if _is_ajax(): return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error"); return redirect(url_for("claim", code=item["code"]))
         if not feature_verified:
-            flash("请勾选“已核对物品特征”。", "error")
-            return redirect(url_for("claim", code=item["code"]))
+            msg = "请勾选“已核对物品特征”。"
+            if _is_ajax(): return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error"); return redirect(url_for("claim", code=item["code"]))
+
+        # 处理认领人照片（可选，给老人等记不清电话的留照备查）
+        claimer_photo = None
+        cp_data = request.form.get("claimer_photo_data")    # 拍照 base64
+        cp_file = request.files.get("claimer_photo_file")   # 文件上传
+        if cp_data and cp_data.startswith("data:image"):
+            import base64 as _b64
+            header, b64 = cp_data.split(",", 1)
+            ext = "png" if "png" in header else "jpeg"
+            fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
+            with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
+                f.write(_b64.b64decode(b64))
+            claimer_photo = fname
+        elif cp_file and cp_file.filename and allowed_photo(cp_file.filename):
+            ext = cp_file.filename.rsplit(".", 1)[1].lower()
+            fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
+            cp_file.save(os.path.join(config.UPLOAD_FOLDER, fname))
+            claimer_photo = fname
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.execute(
             """UPDATE items SET status='已认领', claimer_name=?, claimer_phone=?,
-               feature_verified=?, claimed_at=?, operator=? WHERE id=?""",
-            (claimer_name, claimer_phone, feature_verified, now, operator, item_id)
+               feature_verified=?, claimed_at=?, operator=?, claimer_photo=? WHERE id=?""",
+            (claimer_name, claimer_phone, feature_verified, now, operator,
+             claimer_photo, item_id)
         )
         db.commit()
-        flash(f"认领登记完成：{item['code']} 已归还给 {claimer_name}", "success")
-        # 从工作台抽屉来 → 回工作台；从认领页来 → 回认领页
+        msg = f"认领登记完成：{item['code']} 已归还给 {claimer_name}"
+        # AJAX 提交（工作台抽屉）：返回 JSON
+        if _is_ajax():
+            return jsonify({"ok": True, "msg": msg, "item": dict(item)})
+        flash(msg, "success")
         return redirect(url_for("index"))
 
     # GET：可带 code 直接定位

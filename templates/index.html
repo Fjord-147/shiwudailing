@@ -378,7 +378,7 @@ function fillClaimForm(it){
     document.getElementById('claim_results').innerHTML = detailHtml;
 
     var formHtml =
-        '<form method="post" action="{{ url_for('claim') }}" id="claimSubmitForm">'+
+        '<form id="claimSubmitForm" onsubmit="submitClaim(event)">'+
         '<input type="hidden" name="item_id" value="'+it.id+'">'+
         '<div class="form-row2">'+
         '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
@@ -386,11 +386,76 @@ function fillClaimForm(it){
         '</div>'+
         '<input type="hidden" name="operator" value="{{ current_user }}">'+
         '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" name="feature_verified" value="1"><span>我已核对物品特征无误</span></label>'+
+        '<div class="form-group" style="margin-bottom:14px;">'+
+        '<label>认领人照片 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（选填，老人等记不清电话时可留照备查）</span></label>'+
+        '<div class="photo-box">'+
+        '<div class="photo-tabs">'+
+        '<button type="button" class="photo-tab active" data-tab="camera" data-tab-group="cphoto" onclick="switchPhotoTab(this,\'cphoto\')">📷 拍照</button>'+
+        '<button type="button" class="photo-tab" data-tab="upload" data-tab-group="cphoto" onclick="switchPhotoTab(this,\'cphoto\')">📁 上传</button>'+
+        '</div>'+
+        '<div id="cphoto_camera">'+
+        '<video id="cphoto_video" autoplay playsinline></video>'+
+        '<div style="margin-top:8px;"><button type="button" class="btn btn-sm" onclick="capturePhoto(\'cphoto_video\',\'cphoto_preview\',\'cphoto_data\')">📸 抓拍</button></div>'+
+        '</div>'+
+        '<div id="cphoto_upload" style="display:none;">'+
+        '<input type="file" name="claimer_photo_file" id="cphoto_file" accept="image/*" class="form-control" onchange="previewFile(this,\'cphoto_preview\',\'cphoto_data\')">'+
+        '</div>'+
+        '<img id="cphoto_preview" src="" style="display:none;">'+
+        '<input type="hidden" name="claimer_photo_data" id="cphoto_data">'+
+        '</div>'+
+        '</div>'+
         '<button type="submit" class="btn btn-success btn-block">✓ 确认认领</button>'+
+        '<div style="font-size:12px;color:#6b7280;margin-top:8px;text-align:center;">不传照片也能正常认领</div>'+
         '</form>';
     var formArea = document.getElementById('claim_form_area');
     formArea.innerHTML = formHtml;
     trackForm('claim', document.getElementById('claimSubmitForm'));  // 跟踪新表单
+}
+
+/* 认领 AJAX 提交（和登记一样，留工作台弹提醒）*/
+function submitClaim(e){
+    e.preventDefault();
+    var form = document.getElementById('claimSubmitForm');
+    var fd = new FormData(form);
+    // 文件上传和拍照base64同时存在时，优先用拍照（清掉file），避免重复
+    var photoData = document.getElementById('cphoto_data').value;
+    var photoFile = document.getElementById('cphoto_file').value;
+    if(photoData){ fd.delete('claimer_photo_file'); }
+    fetch("{{ url_for('claim') }}", {
+        method:'POST', body: fd,
+        headers: {'X-Requested-With': 'fetch'}
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+        if(!data.ok){
+            toast(data.msg || '认领失败，请检查必填项', 'error');
+            return;
+        }
+        // 成功：关抽屉、刷新列表、弹提醒
+        formDirty.claim = false;
+        closeDrawer('claim');
+        refreshPending();
+        showClaimNotice(data.msg);
+    })
+    .catch(function(){
+        toast('网络错误，请重试', 'error');
+    });
+}
+
+/* 认领成功提醒（15秒消失）*/
+var _claimNoticeTimer = null;
+function showClaimNotice(msg){
+    var box = document.getElementById('regNotice');
+    box.className = 'flash success';
+    box.innerHTML = '✓ '+escapeHtml(msg);
+    box.style.display = 'block';
+    box.scrollIntoView({behavior:'smooth', block:'center'});
+    if(_claimNoticeTimer) clearTimeout(_claimNoticeTimer);
+    _claimNoticeTimer = setTimeout(function(){
+        box.style.transition = 'opacity .5s';
+        box.style.opacity = '0';
+        setTimeout(function(){ box.style.display='none'; box.style.opacity='1'; }, 500);
+    }, 15000);
 }
 
 /* ESC 关抽屉（带保护）*/
