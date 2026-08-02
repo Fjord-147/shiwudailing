@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - 门诊失物招领</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="login-wrap">
+        <div class="login-box">
+            <h1>🏥 门诊失物招领</h1>
+            <div class="sub">失物登记 · 认领管理 · 统计导出</div>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for cat, msg in messages %}
+                    <div class="flash {{ cat }}">{{ msg }}</div>
+                {% endfor %}
+            {% endwith %}
+
+            <form method="post">
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label>进入口令</label>
+                    <input type="password" name="password" class="form-control"
+                           placeholder="请输入口令" autofocus required>
+                </div>
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label>您的姓名 <span class="req">*</span></label>
+                    <input type="text" name="staff_name" class="form-control"
+                           placeholder="用于登记操作人" list="staff_list" required>
+                    <datalist id="staff_list">
+                        {% for n in staff_names %}
+                            <option value="{{ n }}">
+                        {% endfor %}
+                    </datalist>
+                </div>
+                <button type="submit" class="btn btn-block">进入管理后台</button>
+            </form>
+            <div style="text-align:center;margin-top:16px;">
+                <a href="{{ url_for('public_index') }}" style="font-size:13px;">← 返回失物招领首页</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

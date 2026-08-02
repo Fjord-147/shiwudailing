@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}拾物登记 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">📝 拾物登记</h1>
+<p class="page-subtitle">捡到物品后在此登记，系统会自动生成失物编号</p>
+
+<div class="card">
+<form method="post" enctype="multipart/form-data" id="regForm">
+    <div class="form-grid">
+
+        <div class="form-group full">
+            <label>物品名称 <span class="req">*</span></label>
+            <input type="text" name="name" class="form-control"
+                   placeholder="如：黑色钱包、医保卡、一串钥匙" required>
+        </div>
+
+        <div class="form-group">
+            <label>类别</label>
+            <select name="category" class="form-control">
+                {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>捡到地点</label>
+            <select name="found_location" class="form-control"
+                    onchange="toggleOther(this,'loc_other')">
+                {% for l in locations %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+                <option value="__other__">＋ 其他（手填）</option>
+            </select>
+            <input type="text" id="loc_other" name="found_location_other"
+                   class="form-control" placeholder="手填地点" style="display:none;margin-top:6px;">
+        </div>
+
+        <div class="form-group full">
+            <label>物品特征描述</label>
+            <textarea name="description" class="form-control"
+                placeholder="关键核对信息，如：内有医保卡一张、现金若干；或：钥匙上挂小熊挂件"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>捡到时间</label>
+            <input type="datetime-local" name="found_time" class="form-control"
+                   value="{{ default_time }}">
+        </div>
+
+        <div class="form-group">
+            <label>捡到人</label>
+            <select name="founder" class="form-control">
+                <option value="{{ current_user }}" selected>{{ current_user }}</option>
+                {% for s in staff_names %}
+                    {% if s != current_user %}<option value="{{ s }}">{{ s }}</option>{% endif %}
+                {% endfor %}
+                <option value="__other__">＋ 其他（手填）</option>
+            </select>
+            <input type="text" id="founder_other" name="founder_other"
+                   class="form-control" placeholder="手填姓名" style="display:none;margin-top:6px;">
+        </div>
+
+        <div class="form-group full">
+            <label>物品照片（认领核对用，建议拍一张）</label>
+            <div class="photo-box">
+                <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
+                    💡 手机端若「拍照」不可用，请点「上传图片」可直接调起手机摄像头
+                </div>
+                <div class="photo-tabs">
+                    <button type="button" class="photo-tab active"
+                            data-tab="camera" data-tab-group="photo"
+                            onclick="switchPhotoTab(this,'photo')">📷 拍照</button>
+                    <button type="button" class="photo-tab"
+                            data-tab="upload" data-tab-group="photo"
+                            onclick="switchPhotoTab(this,'photo')">📁 上传图片</button>
+                </div>
+
+                <!-- 拍照 -->
+                <div id="photo_camera">
+                    <video id="photo_video" autoplay playsinline></video>
+                    <div style="margin-top:8px;">
+                        <button type="button" class="btn btn-sm" onclick="capturePhoto('photo_video','photo_preview','photo_data')">📸 抓拍</button>
+                    </div>
+                </div>
+
+                <!-- 上传 -->
+                <div id="photo_upload" style="display:none;">
+                    <input type="file" name="photo_file" id="photo_file"
+                           accept="image/*" class="form-control"
+                           onchange="previewFile(this,'photo_preview','photo_data')">
+                </div>
+
+                <img id="photo_preview" src="" style="display:none;">
+                <input type="hidden" name="photo_data" id="photo_data">
+            </div>
+            <label class="checkbox-row" style="margin-top:10px;">
+                <input type="checkbox" name="hide_photo" value="1">
+                <span>🔒 隐藏照片（证件、医保卡等敏感物品，公众界面将不显示照片）</span>
+            </label>
+        </div>
+    </div>
+
+    <div class="btn-row">
+        <button type="submit" class="btn">✓ 提交登记</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">取消</a>
+    </div>
+</form>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+// 捡到人下拉“其他”联动
+document.querySelector('select[name="founder"]').addEventListener('change', function(){
+    toggleOther(this, 'founder_other');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,107 @@
+{% extends "base_public.html" %}
+{% block title %}我要报失 - 门诊失物招领{% endblock %}
+{% block content %}
+
+<div class="public-hero">
+    <h1>📝 我要报失</h1>
+    <p>丢了东西？在这里登记一下，我们会帮您留意。捡到匹配的物品会通知您。</p>
+</div>
+
+<div class="card">
+<form method="post" enctype="multipart/form-data" id="reportForm">
+    <div class="form-grid">
+
+        <div class="form-group">
+            <label>您的姓名 <span class="req">*</span></label>
+            <input type="text" name="owner_name" class="form-control" required placeholder="您的称呼">
+        </div>
+        <div class="form-group">
+            <label>联系电话 <span class="req">*</span></label>
+            <input type="text" name="owner_phone" class="form-control" required placeholder="手机号码">
+        </div>
+
+        <div class="form-group full">
+            <label>丢失物品名称 <span class="req">*</span></label>
+            <input type="text" name="item_name" class="form-control" required
+                   placeholder="如：黑色钱包、医保卡">
+        </div>
+
+        <div class="form-group">
+            <label>物品类别</label>
+            <select name="item_category" class="form-control">
+                {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label>丢失地点</label>
+            <select name="lost_location" class="form-control" onchange="toggleOther(this,'loc_other')">
+                {% for l in locations %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+                <option value="__other__">＋ 其他（手填）</option>
+            </select>
+            <input type="text" id="loc_other" name="lost_location_other"
+                   class="form-control" placeholder="手填地点" style="display:none;margin-top:6px;">
+        </div>
+
+        <div class="form-group full">
+            <label>物品特征描述</label>
+            <textarea name="description" class="form-control"
+                placeholder="描述越详细越容易找到，如：内有医保卡一张、钥匙两把；颜色、品牌、破损等"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>丢失时间（大约）</label>
+            <input type="datetime-local" name="lost_time" class="form-control" value="{{ default_time }}">
+        </div>
+
+        <div class="form-group full">
+            <label>物品照片（选填，有照片更容易匹配）</label>
+            <div class="photo-box">
+                <div style="font-size:12px;color:#6b7280;margin-bottom:8px;">
+                    💡 手机端请点「上传图片」可直接调起手机摄像头
+                </div>
+                <div class="photo-tabs">
+                    <button type="button" class="photo-tab active"
+                            data-tab="camera" data-tab-group="photo"
+                            onclick="switchPhotoTab(this,'photo')">📷 拍照</button>
+                    <button type="button" class="photo-tab"
+                            data-tab="upload" data-tab-group="photo"
+                            onclick="switchPhotoTab(this,'photo')">📁 上传图片</button>
+                </div>
+                <div id="photo_camera">
+                    <video id="photo_video" autoplay playsinline></video>
+                    <div style="margin-top:8px;">
+                        <button type="button" class="btn btn-sm" onclick="capturePhoto('photo_video','photo_preview','photo_data')">📸 抓拍</button>
+                    </div>
+                </div>
+                <div id="photo_upload" style="display:none;">
+                    <input type="file" name="photo_file" id="photo_file" accept="image/*"
+                           class="form-control"
+                           onchange="previewFile(this,'photo_preview','photo_data')">
+                </div>
+                <img id="photo_preview" src="" style="display:none;">
+                <input type="hidden" name="photo_data" id="photo_data">
+            </div>
+        </div>
+    </div>
+
+    <div class="checkbox-row" style="margin-top:14px;">
+        <input type="checkbox" required>
+        <span>我承诺所填信息真实，便于导医联系核对认领。</span>
+    </div>
+
+    <div class="btn-row">
+        <button type="submit" class="btn">✓ 提交报失</button>
+        <a href="{{ url_for('public_index') }}" class="btn btn-secondary">返回</a>
+    </div>
+</form>
+</div>
+
+<div class="card" style="background:#fff8e1;border:1px solid #ffe082;">
+    <strong>⚠️ 温馨提示</strong>
+    <ul style="margin:8px 0 0 20px;font-size:14px;color:#8d6e00;">
+        <li>您填写的信息仅门诊导医台可见，不会公开展示。</li>
+        <li>报失后仍建议您主动到导医台询问，或定期查看上方"失物招领"列表。</li>
+        <li>认领时需本人到场，核对物品特征无误后归还。</li>
+    </ul>
+</div>
+{% endblock %}

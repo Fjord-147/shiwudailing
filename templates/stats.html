@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}统计导出 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">📊 统计导出</h1>
+<p class="page-subtitle">选择时间段查看统计，可一键导出 Excel 留档上报</p>
+
+<div class="card">
+    <form method="get">
+        <div class="search-bar">
+            <label style="font-size:14px;align-self:center;">时间段：</label>
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+            <span style="align-self:center;">至</span>
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
+            <button type="submit" class="btn btn-secondary btn-sm">统计</button>
+            <a href="{{ url_for('stats') }}" class="btn btn-secondary btn-sm">本月</a>
+        </div>
+    </form>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="num">{{ found_count }}</div>
+        <div class="label">登记捡到</div>
+    </div>
+    <div class="stat-card success">
+        <div class="num">{{ returned_count }}</div>
+        <div class="label">已归还</div>
+    </div>
+    <div class="stat-card warn">
+        <div class="num">{{ pending_count }}</div>
+        <div class="label">待认领</div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>按类别统计</h2>
+    {% if by_category %}
+    <table class="data">
+        <thead>
+            <tr><th>类别</th><th>数量</th></tr>
+        </thead>
+        <tbody>
+            {% for row in by_category %}
+            <tr>
+                <td>{{ row.category or '未分类' }}</td>
+                <td>{{ row.c }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty">该时间段无数据</div>
+    {% endif %}
+</div>
+
+<div class="btn-row">
+    <a href="{{ url_for('export', date_from=date_from, date_to=date_to) }}" class="btn">
+        📥 导出该时间段 Excel
+    </a>
+    <a href="{{ url_for('export') }}" class="btn btn-secondary">📥 导出全部数据</a>
+</div>
+{% endblock %}

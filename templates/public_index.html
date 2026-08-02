@@ -1,0 +1,91 @@
+{% extends "base_public.html" %}
+{% block title %}失物招领 - 门诊{% endblock %}
+{% block content %}
+
+<div class="public-hero">
+    <h1>失物招领</h1>
+    <p>这里展示门诊捡到的、正在等待认领的物品。看到您丢失的物品，请到<strong>门诊导医台</strong>当面核对认领。</p>
+</div>
+
+<!-- 搜索 + 类别筛选 -->
+<form method="get" class="public-toolbar">
+    <input type="text" name="q" class="form-control" placeholder="搜索物品名称、特征、地点..."
+           value="{{ q }}">
+    <button type="submit" class="btn btn-secondary btn-sm">🔍 搜索</button>
+    <a href="{{ url_for('public_index') }}" class="btn btn-secondary btn-sm">全部</a>
+</form>
+
+<div class="filter-tabs">
+    <a href="{{ url_for('public_index', q=q) }}" class="filter-tab {% if not cat %}active{% endif %}">全部</a>
+    {% for c in categories %}
+    <a href="{{ url_for('public_index', category=c, q=q) }}"
+       class="filter-tab {% if cat == c %}active{% endif %}">{{ c }}</a>
+    {% endfor %}
+</div>
+
+{% if items %}
+<div class="card-grid">
+    {% for it in items %}
+    <div class="goods-card" onclick="showPublicDetail({{ it.id }})">
+        <div class="goods-photo">
+            {% if it.photo and not it.hide_photo %}
+                <img src="{{ url_for('public_photo', item_id=it.id) }}">
+            {% else %}
+                <div class="goods-photo-placeholder">📦</div>
+            {% endif %}
+        </div>
+        <div class="goods-info">
+            <div class="goods-name">{{ it.name }}</div>
+            <div class="goods-meta">
+                <span class="tag tag-pending">{{ it.category or '未分类' }}</span>
+                <span class="goods-loc">📍 {{ it.found_location or '门诊' }}</span>
+            </div>
+            <div class="goods-time">捡到时间：{{ it.found_time or it.created_at[:10] }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty public-empty">
+    <div style="font-size:48px;margin-bottom:12px;">🔍</div>
+    <p>目前没有待认领的物品</p>
+    <p style="font-size:13px;margin-top:8px;">如果您丢了东西，可以<a href="{{ url_for('public_report') }}">在这里报失</a>，我们会留意</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+/* 公众详情弹窗：走公开接口 /public/item，不暴露认领人隐私 */
+function showPublicDetail(itemId) {
+    fetch("/public/item/" + itemId).then(function(r){return r.json();})
+        .then(function(data){
+            if(!data.ok){toast("读取失败","error");return;}
+            var it = data.item;
+            // 后端已对 hide_photo 的物品清空了 photo 字段
+            var photoHtml = it.photo
+                ? '<img class="photo-big" src="/public/photo/' + it.id + '">'
+                : '<div style="color:#999;margin:10px 0;">（未提供照片，请到导医台查看实物）</div>';
+            var html =
+                '<div class="detail-panel" style="margin:0;">' +
+                '<div><span class="code" style="color:#666;font-size:13px;">编号 ' + it.code + '</span>' +
+                '<span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>' +
+                '<div style="font-size:20px;font-weight:600;margin:6px 0;">' + it.name + '</div>' +
+                photoHtml +
+                '<div class="detail-grid">' +
+                '<div><span class="k">类别：</span><span class="v">' + (it.category||'—') + '</span></div>' +
+                '<div><span class="k">捡到地点：</span><span class="v">' + (it.found_location||'—') + '</span></div>' +
+                '<div><span class="k">捡到时间：</span><span class="v">' + (it.found_time||'—') + '</span></div>' +
+                '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">' +
+                (it.description||'—') + '</span></div>' +
+                '</div>' +
+                '<div style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:6px;font-size:14px;color:#8d6e00;">' +
+                '👆 如果这是您丢失的物品，请到<strong>门诊导医台</strong>，报上失物编号，当面核对认领。' +
+                '</div>' +
+                '</div>';
+            openModal(html);
+        });
+}
+</script>
+{% endblock %}

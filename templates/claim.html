@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block title %}认领登记 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">🔍 认领登记</h1>
+<p class="page-subtitle">失主来领取时，先找到物品，再核对特征、登记失主信息</p>
+
+<!-- 搜索 -->
+<div class="card">
+    <form method="get" action="{{ url_for('claim') }}">
+        <div class="search-bar">
+            <input type="text" name="code" class="form-control"
+                   placeholder="输入失物编号或名称直接定位"
+                   value="{{ code }}">
+            <button type="submit" class="btn">查找定位</button>
+            <a href="{{ url_for('claim') }}" class="btn btn-secondary">清空</a>
+        </div>
+        <div style="font-size:13px;color:#6b7280;margin-top:6px;">
+            也可在下方待认领列表里点“认领”
+        </div>
+    </form>
+</div>
+
+<!-- 定位到的物品 → 认领表单 -->
+{% if target_item and target_item.status == '待认领' %}
+<div class="detail-panel">
+    <div>
+        <span style="color:#666;font-size:13px;">编号 {{ target_item.code }}</span>
+        <span class="tag tag-pending" style="margin-left:8px;">待认领</span>
+    </div>
+    <div style="font-size:20px;font-weight:600;margin:6px 0;">{{ target_item.name }}</div>
+    {% if target_item.photo %}
+        <img class="photo-big" src="{{ url_for('serve_upload', filename=target_item.photo) }}">
+    {% else %}
+        <div style="color:#999;margin:8px 0;">（无照片）</div>
+    {% endif %}
+    <div class="detail-grid">
+        <div><span class="k">类别：</span><span class="v">{{ target_item.category or '—' }}</span></div>
+        <div><span class="k">捡到地点：</span><span class="v">{{ target_item.found_location or '—' }}</span></div>
+        <div><span class="k">捡到时间：</span><span class="v">{{ target_item.found_time or '—' }}</span></div>
+        <div><span class="k">捡到人：</span><span class="v">{{ target_item.founder or '—' }}</span></div>
+        <div style="grid-column:1/-1;"><span class="k">特征描述（请与失主核对）：</span><br>
+            <span class="v" style="font-size:16px;font-weight:600;color:#c62828;">
+                {{ target_item.description or '（未填写特征）' }}
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>登记认领信息</h2>
+    <form method="post">
+        <input type="hidden" name="item_id" value="{{ target_item.id }}">
+        <input type="hidden" name="code" value="{{ target_item.code }}">
+        <div class="form-grid">
+            <div class="form-group">
+                <label>认领人姓名 <span class="req">*</span></label>
+                <input type="text" name="claimer_name" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>认领人电话 <span class="req">*</span></label>
+                <input type="text" name="claimer_phone" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>经办人（当前操作人）</label>
+                <select name="operator" class="form-control">
+                    <option value="{{ current_user }}" selected>{{ current_user }}</option>
+                    {% for s in staff_names %}
+                        {% if s != current_user %}<option value="{{ s }}">{{ s }}</option>{% endif %}
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div style="margin-top:14px;">
+            <label class="checkbox-row">
+                <input type="checkbox" name="feature_verified" value="1">
+                <span>我已让认领人说出物品特征并核对无误（如包内物品、外观细节），确认其为失主本人。</span>
+            </label>
+        </div>
+        <div class="btn-row">
+            <button type="submit" class="btn btn-success" onclick="return confirm('确认完成认领登记？提交后该物品状态将变为“已认领”。')">✓ 确认认领</button>
+            <a href="{{ url_for('claim') }}" class="btn btn-secondary">取消</a>
+        </div>
+    </form>
+</div>
+
+{% elif target_item and target_item.status == '已认领' %}
+<div class="flash error" style="margin-bottom:20px;">
+    该物品（{{ target_item.code }} {{ target_item.name }}）已被认领，无法重复登记。
+</div>
+
+{% endif %}
+
+<!-- 待认领列表 -->
+<div class="card">
+    <h2>待认领物品{% if q %}（搜索“{{ q }}”结果）{% endif %}</h2>
+    {% if items %}
+    <div class="search-bar" style="margin-bottom:14px;">
+        <form method="get" style="display:flex;gap:8px;flex:1;">
+            <input type="text" name="q" class="form-control" placeholder="按名称/编号/特征搜索"
+                   value="{{ q }}">
+            <button type="submit" class="btn btn-secondary btn-sm">搜索</button>
+        </form>
+    </div>
+    <div class="item-list">
+        {% for it in items %}
+        <div class="item-row">
+            {% if it.photo %}
+                <img class="thumb" src="{{ url_for('serve_upload', filename=it.photo) }}">
+            {% else %}
+                <div class="thumb-placeholder">📦</div>
+            {% endif %}
+            <div class="info">
+                <div class="code">编号 {{ it.code }}</div>
+                <div class="name">{{ it.name }}</div>
+                <div class="meta">{{ it.category or '未分类' }} · {{ it.found_location or '—' }} · {{ it.found_time or '' }}</div>
+            </div>
+            <div class="actions">
+                <a href="{{ url_for('claim', code=it.code) }}" class="btn btn-success btn-sm">认领</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+        {% if q %}没有找到匹配“{{ q }}”的待认领物品{% else %}🎉 暂无待认领物品{% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

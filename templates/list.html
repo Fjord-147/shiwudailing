@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}失物总表 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">📋 失物总表</h1>
+<p class="page-subtitle">共 {{ items|length }} 条记录，点击任意一行查看详情</p>
+
+<div class="card">
+    <!-- 筛选标签 -->
+    <div class="filter-tabs">
+        <a href="{{ url_for('item_list', status='all', q=q, date_from=date_from, date_to=date_to) }}"
+           class="filter-tab {% if status=='all' %}active{% endif %}">全部</a>
+        <a href="{{ url_for('item_list', status='待认领', q=q, date_from=date_from, date_to=date_to) }}"
+           class="filter-tab {% if status=='待认领' %}active{% endif %}">待认领</a>
+        <a href="{{ url_for('item_list', status='已认领', q=q, date_from=date_from, date_to=date_to) }}"
+           class="filter-tab {% if status=='已认领' %}active{% endif %}">已认领</a>
+    </div>
+
+    <!-- 搜索 -->
+    <form method="get">
+        <div class="search-bar">
+            <input type="hidden" name="status" value="{{ status }}">
+            <input type="text" name="q" class="form-control" placeholder="编号/名称/类别/特征"
+                   value="{{ q }}">
+            <input type="date" name="date_from" class="form-control" value="{{ date_from }}" title="登记起">
+            <input type="date" name="date_to" class="form-control" value="{{ date_to }}" title="登记止">
+            <button type="submit" class="btn btn-secondary btn-sm">筛选</button>
+            <a href="{{ url_for('item_list') }}" class="btn btn-secondary btn-sm">重置</a>
+        </div>
+    </form>
+
+    {% if items %}
+    <div class="table-wrap">
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>编号</th>
+                    <th>名称</th>
+                    <th>类别</th>
+                    <th>捡到地点</th>
+                    <th>捡到时间</th>
+                    <th>状态</th>
+                    <th>认领人</th>
+                    <th>认领时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in items %}
+                <tr onclick="showDetail({{ it.id }})">
+                    <td>{{ it.code }}</td>
+                    <td>{{ it.name }}</td>
+                    <td>{{ it.category or '—' }}</td>
+                    <td>{{ it.found_location or '—' }}</td>
+                    <td>{{ it.found_time or '—' }}</td>
+                    <td>
+                        {% if it.status == '已认领' %}
+                            <span class="tag tag-returned">已认领</span>
+                        {% else %}
+                            <span class="tag tag-pending">待认领</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ it.claimer_name or '—' }}</td>
+                    <td>{{ it.claimed_at or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty">没有符合条件的记录</div>
+    {% endif %}
+</div>
+{% endblock %}

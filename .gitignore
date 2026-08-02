@@ -1,0 +1,42 @@
+# ===== 敏感数据（绝不提交）=====
+# 数据库文件（含认领人姓名、电话等隐私）
+lostfound.db
+lostfound.db-journal
+*.sqlite
+*.sqlite3
+
+# 上传的照片（可能含证件、医保卡等隐私）
+uploads/
+
+# 环境变量（含真实口令和密钥）
+.env
+
+# 导出的 Excel
+*.xlsx
+
+# ===== Python =====
+# 虚拟环境
+venv/
+env/
+.venv/
+
+# 字节码缓存
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 打包/分发
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# ===== 工具元数据 =====
+.zcode/

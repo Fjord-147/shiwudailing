@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}工作台 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">工作台</h1>
+<p class="page-subtitle">您好 {{ current_user }}，这里是失物招领管理总览</p>
+
+{% if pending_reports > 0 %}
+<a href="{{ url_for('reports') }}" class="flash success" style="text-decoration:none;display:block;margin-bottom:20px;">
+    📬 有 <strong>{{ pending_reports }}</strong> 条新报失待处理，点击查看 →
+</a>
+{% endif %}
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="num">{{ today_count }}</div>
+        <div class="label">今日新登记</div>
+    </div>
+    <div class="stat-card warn">
+        <div class="num">{{ pending_count }}</div>
+        <div class="label">待认领总数</div>
+    </div>
+    <div class="stat-card success">
+        <div class="num">{{ month_returned }}</div>
+        <div class="label">本月已归还</div>
+    </div>
+</div>
+
+<div class="btn-row" style="margin-bottom:24px;">
+    <a href="{{ url_for('register') }}" class="btn">📝 拾物登记</a>
+    <a href="{{ url_for('claim') }}" class="btn btn-success">🔍 认领登记</a>
+    <a href="{{ url_for('item_list') }}" class="btn btn-secondary">📋 查看全部</a>
+    <a href="{{ url_for('reports') }}" class="btn btn-secondary">📋 报失处理</a>
+</div>
+
+<div class="card">
+    <h2>待认领清单（最近 {{ pending_items|length }} 件）</h2>
+    {% if pending_items %}
+    <div class="item-list">
+        {% for it in pending_items %}
+        <div class="item-row" onclick="location.href='{{ url_for('claim', code=it.code) }}'">
+            {% if it.photo %}
+                <img class="thumb" src="{{ url_for('serve_upload', filename=it.photo) }}">
+            {% else %}
+                <div class="thumb-placeholder">📦</div>
+            {% endif %}
+            <div class="info">
+                <div class="code">编号 {{ it.code }}</div>
+                <div class="name">{{ it.name }}　<span class="tag tag-pending">待认领</span></div>
+                <div class="meta">
+                    {{ it.category or '未分类' }} ·
+                    {{ it.found_location or '地点未填' }} ·
+                    捡到 {{ it.found_time or it.created_at[:10] }}
+                </div>
+            </div>
+            <div class="actions">
+                <a href="{{ url_for('claim', code=it.code) }}" class="btn btn-success btn-sm">去认领</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">🎉 暂无待认领物品</div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}门诊失物招领{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    {% block body %}
+    <nav class="navbar">
+        <div class="brand">🏥 门诊失物招领</div>
+        <div class="nav-links">
+            <a href="{{ url_for('index') }}" class="{% if active == 'index' %}active{% endif %}">工作台</a>
+            <a href="{{ url_for('register') }}" class="{% if active == 'register' %}active{% endif %}">拾物登记</a>
+            <a href="{{ url_for('claim') }}" class="{% if active == 'claim' %}active{% endif %}">认领登记</a>
+            <a href="{{ url_for('item_list') }}" class="{% if active == 'list' %}active{% endif %}">失物总表</a>
+            <a href="{{ url_for('reports') }}" class="{% if active == 'reports' %}active{% endif %}">报失处理</a>
+            <a href="{{ url_for('stats') }}" class="{% if active == 'stats' %}active{% endif %}">统计导出</a>
+        </div>
+        <div class="user-box">
+            <span>当前：<span class="name">{{ current_user }}</span></span>
+            <a href="{{ url_for('switch_user') }}">换人</a>
+            <a href="{{ url_for('logout') }}">退出</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% for cat, msg in messages %}
+                <div class="flash {{ cat }}">{{ msg }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    {% block script %}{% endblock %}
+    {% endblock %}
+</body>
+</html>

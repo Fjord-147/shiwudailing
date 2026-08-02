@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}报失处理 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">📋 报失处理</h1>
+<p class="page-subtitle">公众提交的报失记录在这里，共 {{ reports|length }} 条</p>
+
+<!-- 状态筛选 -->
+<div class="filter-tabs">
+    <a href="{{ url_for('reports', status='待查找', q=q) }}"
+       class="filter-tab {% if status=='待查找' %}active{% endif %}">待查找 ({{ counts['待查找'] }})</a>
+    <a href="{{ url_for('reports', status='已找到', q=q) }}"
+       class="filter-tab {% if status=='已找到' %}active{% endif %}">已找到 ({{ counts['已找到'] }})</a>
+    <a href="{{ url_for('reports', status='已忽略', q=q) }}"
+       class="filter-tab {% if status=='已忽略' %}active{% endif %}">已忽略 ({{ counts['已忽略'] }})</a>
+    <a href="{{ url_for('reports', status='all', q=q) }}"
+       class="filter-tab {% if status=='all' %}active{% endif %}">全部</a>
+</div>
+
+<!-- 搜索 -->
+<form method="get">
+    <div class="search-bar">
+        <input type="hidden" name="status" value="{{ status }}">
+        <input type="text" name="q" class="form-control"
+               placeholder="按失主姓名/电话/物品名搜索" value="{{ q }}">
+        <button type="submit" class="btn btn-secondary btn-sm">搜索</button>
+    </div>
+</form>
+
+{% if reports %}
+<div class="report-list">
+    {% for r in reports %}
+    <div class="report-card {% if r.status=='已找到' %}resolved{% elif r.status=='已忽略' %}ignored{% endif %}">
+        <div class="report-card-head">
+            <span class="report-item-name">{{ r.item_name }}</span>
+            {% if r.status == '待查找' %}
+                <span class="tag tag-pending">待查找</span>
+            {% elif r.status == '已找到' %}
+                <span class="tag tag-returned">已找到</span>
+            {% else %}
+                <span class="tag tag-muted">已忽略</span>
+            {% endif %}
+            <span class="report-time">{{ r.created_at }}</span>
+        </div>
+        <div class="report-card-body">
+            {% if r.photo %}
+                <img class="report-photo" src="{{ url_for('serve_upload', filename=r.photo) }}"
+                     onclick="showReportPhoto('{{ r.photo }}')">
+            {% endif %}
+            <div class="report-detail">
+                <div><span class="k">失主：</span>{{ r.owner_name }}　<span class="k">电话：</span>{{ r.owner_phone }}</div>
+                <div><span class="k">类别：</span>{{ r.item_category or '—' }}　<span class="k">丢失地点：</span>{{ r.lost_location or '—' }}</div>
+                <div><span class="k">丢失时间：</span>{{ r.lost_time or '—' }}</div>
+                {% if r.description %}
+                <div><span class="k">特征：</span>{{ r.description }}</div>
+                {% endif %}
+                {% if r.status != '待查找' %}
+                <div class="report-handled">
+                    处理：{{ r.handled_by or '—' }} · {{ r.handled_at or '—' }}
+                    {% if r.note %}· 备注：{{ r.note }}{% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% if r.status == '待查找' %}
+        <form method="post" class="report-actions">
+            <input type="hidden" name="report_id" value="{{ r.id }}">
+            <input type="text" name="note" class="form-control" placeholder="处理备注（选填，如：已匹配编号XXX / 电话联系未果）">
+            <button type="submit" name="action" value="found" class="btn btn-success btn-sm">✓ 已找到</button>
+            <button type="submit" name="action" value="ignore" class="btn btn-secondary btn-sm">忽略</button>
+        </form>
+        {% else %}
+        <form method="post" class="report-actions">
+            <input type="hidden" name="report_id" value="{{ r.id }}">
+            <button type="submit" name="action" value="reopen" class="btn btn-secondary btn-sm">↩ 重新查找</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty">没有报失记录</div>
+{% endif %}
+{% endblock %}
+
+{% block script %}
+<script>
+function showReportPhoto(photo){
+    openModal('<div style="text-align:center;"><img src="/uploads/'+photo+'" style="max-width:100%;border-radius:8px;"></div>');
+}
+</script>
+{% endblock %}
