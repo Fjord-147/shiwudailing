@@ -243,7 +243,8 @@ def index():
                            pending_count=pending_count,
                            month_returned=month_returned,
                            pending_reports=pending_reports,
-                           pending_items=pending_items)
+                           pending_items=pending_items,
+                           default_time=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 
 
 # ============================================================
@@ -510,7 +511,8 @@ def claim():
         )
         db.commit()
         flash(f"认领登记完成：{item['code']} 已归还给 {claimer_name}", "success")
-        return redirect(url_for("claim"))
+        # 从工作台抽屉来 → 回工作台；从认领页来 → 回认领页
+        return redirect(url_for("index"))
 
     # GET：可带 code 直接定位
     code = request.args.get("code", "").strip()
@@ -539,6 +541,26 @@ def claim():
                            target_item=target_item,
                            items=items,
                            q=q, code=code)
+
+
+@app.route("/api/claim/search")
+@login_required
+def claim_api():
+    """工作台抽屉用的认领搜索接口，返回 JSON（仅待认领）。"""
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    if q:
+        items = db.execute(
+            """SELECT * FROM items WHERE status='待认领'
+               AND (code LIKE ? OR name LIKE ? OR description LIKE ?)
+               ORDER BY id DESC LIMIT 20""",
+            (f"%{q}%", f"%{q}%", f"%{q}%")
+        ).fetchall()
+    else:
+        items = db.execute(
+            "SELECT * FROM items WHERE status='待认领' ORDER BY id DESC LIMIT 20"
+        ).fetchall()
+    return jsonify({"ok": True, "items": [dict(r) for r in items]})
 
 
 # ============================================================

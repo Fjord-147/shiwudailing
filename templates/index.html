@@ -26,10 +26,111 @@
 </div>
 
 <div class="btn-row" style="margin-bottom:24px;">
-    <a href="{{ url_for('register') }}" class="btn">📝 拾物登记</a>
-    <a href="{{ url_for('claim') }}" class="btn btn-success">🔍 认领登记</a>
+    <button class="btn" onclick="openDrawer('register')">📝 拾物登记</button>
+    <button class="btn btn-success" onclick="openDrawer('claim')">🔍 认领登记</button>
     <a href="{{ url_for('item_list') }}" class="btn btn-secondary">📋 查看全部</a>
-    <a href="{{ url_for('reports') }}" class="btn btn-secondary">📋 报失处理</a>
+    <a href="{{ url_for('reports') }}" class="btn btn-secondary">📬 报失处理</a>
+</div>
+
+<!-- 拾物登记抽屉 -->
+<div class="drawer-overlay" id="drawer_register" onclick="closeDrawerIfOverlay(event,'register')">
+    <div class="drawer" onclick="event.stopPropagation()">
+        <div class="drawer-head">
+            <h2>📝 拾物登记</h2>
+            <button class="drawer-close" onclick="tryCloseDrawer('register')">×</button>
+        </div>
+        <div class="drawer-body">
+            <form method="post" action="{{ url_for('register') }}" enctype="multipart/form-data" id="regDrawerForm">
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>物品名称 <span class="req">*</span></label>
+                    <input type="text" name="name" class="form-control" placeholder="如：黑色钱包" required>
+                </div>
+                <div class="form-row2">
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>类别</label>
+                        <select name="category" class="form-control">
+                            {% for c in categories %}<option value="{{ c }}">{{ c }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>捡到地点</label>
+                        <select name="found_location" class="form-control" onchange="toggleOther(this,'loc_other_dr')">
+                            {% for l in locations %}<option value="{{ l }}">{{ l }}</option>{% endfor %}
+                            <option value="__other__">＋ 其他（手填）</option>
+                        </select>
+                        <input type="text" id="loc_other_dr" name="found_location_other" class="form-control" placeholder="手填地点" style="display:none;margin-top:6px;">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>特征描述</label>
+                    <textarea name="description" class="form-control" placeholder="关键核对信息，如：内有医保卡一张"></textarea>
+                </div>
+                <div class="form-row2">
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>捡到时间</label>
+                        <input type="datetime-local" name="found_time" class="form-control" value="{{ default_time }}">
+                    </div>
+                    <div class="form-group" style="margin-bottom:14px;">
+                        <label>捡到人</label>
+                        <select name="founder" class="form-control">
+                            <option value="{{ current_user }}" selected>{{ current_user }}</option>
+                            {% for s in staff_names %}
+                                {% if s != current_user %}<option value="{{ s }}">{{ s }}</option>{% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>物品照片</label>
+                    <div class="photo-box">
+                        <div class="photo-tabs">
+                            <button type="button" class="photo-tab active" data-tab="camera" data-tab-group="drphoto" onclick="switchPhotoTab(this,'drphoto')">📷 拍照</button>
+                            <button type="button" class="photo-tab" data-tab="upload" data-tab-group="drphoto" onclick="switchPhotoTab(this,'drphoto')">📁 上传</button>
+                        </div>
+                        <div id="drphoto_camera">
+                            <video id="drphoto_video" autoplay playsinline></video>
+                            <div style="margin-top:8px;">
+                                <button type="button" class="btn btn-sm" onclick="capturePhoto('drphoto_video','drphoto_preview','drphoto_data')">📸 抓拍</button>
+                            </div>
+                        </div>
+                        <div id="drphoto_upload" style="display:none;">
+                            <input type="file" name="photo_file" id="drphoto_file" accept="image/*" class="form-control" onchange="previewFile(this,'drphoto_preview','drphoto_data')">
+                        </div>
+                        <img id="drphoto_preview" src="" style="display:none;">
+                        <input type="hidden" name="photo_data" id="drphoto_data">
+                    </div>
+                </div>
+                <label class="checkbox-row" style="margin-bottom:18px;">
+                    <input type="checkbox" name="hide_photo" value="1">
+                    <span>🔒 隐藏照片（证件、医保卡等敏感物品）</span>
+                </label>
+                <div class="btn-row">
+                    <button type="submit" class="btn btn-block">✓ 提交登记</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 认领登记抽屉 -->
+<div class="drawer-overlay" id="drawer_claim" onclick="closeDrawerIfOverlay(event,'claim')">
+    <div class="drawer" onclick="event.stopPropagation()">
+        <div class="drawer-head">
+            <h2>🔍 认领登记</h2>
+            <button class="drawer-close" onclick="tryCloseDrawer('claim')">×</button>
+        </div>
+        <div class="drawer-body">
+            <div class="form-group" style="margin-bottom:14px;">
+                <label>输入失物编号或名称定位</label>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="claim_search" class="form-control" placeholder="如：20260802-001 或 钱包" onkeydown="if(event.key==='Enter'){event.preventDefault();searchClaim();}">
+                    <button class="btn btn-secondary btn-sm" onclick="searchClaim()">搜索</button>
+                </div>
+            </div>
+            <div id="claim_results" class="claim-search-results"></div>
+            <div id="claim_form_area"></div>
+        </div>
+    </div>
 </div>
 
 <div class="card">
@@ -37,7 +138,7 @@
     {% if pending_items %}
     <div class="item-list">
         {% for it in pending_items %}
-        <div class="item-row" onclick="location.href='{{ url_for('claim', code=it.code) }}'">
+        <div class="item-row" onclick="openClaimForCode('{{ it.code }}')">
             {% if it.photo %}
                 <img class="thumb" src="{{ url_for('serve_upload', filename=it.photo) }}">
             {% else %}
@@ -53,7 +154,7 @@
                 </div>
             </div>
             <div class="actions">
-                <a href="{{ url_for('claim', code=it.code) }}" class="btn btn-success btn-sm">去认领</a>
+                <button class="btn btn-success btn-sm" onclick="event.stopPropagation();openClaimForCode('{{ it.code }}')">去认领</button>
             </div>
         </div>
         {% endfor %}
@@ -62,4 +163,143 @@
     <div class="empty">🎉 暂无待认领物品</div>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block script %}
+<script>
+/* ===== 抽屉开关 + 误触保护 ===== */
+// 记录表单是否有改动
+var formDirty = {register: false, claim: false};
+
+// 拦截所有表单输入，标记为脏
+function trackForm(dirtyKey, formEl){
+    if(!formEl) return;
+    formEl.addEventListener('input', function(){
+        // 排除隐藏照片勾选单独判断：只要任何字段被改过就算脏
+        formDirty[dirtyKey] = true;
+    });
+    formEl.addEventListener('change', function(){
+        formDirty[dirtyKey] = true;
+    });
+}
+
+function openDrawer(name){
+    document.getElementById('drawer_'+name).classList.add('open');
+    formDirty[name] = false;  // 打开时重置
+    if(name==='claim'){ searchClaim(); }
+}
+
+function closeDrawer(name){
+    document.getElementById('drawer_'+name).classList.remove('open');
+    stopCamera();
+}
+
+// 尝试关闭：脏的话弹确认
+function tryCloseDrawer(name){
+    if(formDirty[name]){
+        if(!confirm('表单已填写内容，确定要退出编辑吗？退出后内容将丢失。')){
+            return;  // 用户取消，不关
+        }
+    }
+    closeDrawer(name);
+}
+
+function closeDrawerIfOverlay(e, name){
+    if(e.target.classList.contains('drawer-overlay')) tryCloseDrawer(name);
+}
+
+function openClaimForCode(code){
+    document.getElementById('drawer_claim').classList.add('open');
+    formDirty.claim = false;
+    document.getElementById('claim_search').value = code;
+    searchClaim();
+}
+
+/* ===== 认领搜索（AJAX）===== */
+function searchClaim(){
+    var q = document.getElementById('claim_search').value.trim();
+    fetch("{{ url_for('claim_api') }}" + (q ? "?q="+encodeURIComponent(q) : ""))
+        .then(function(r){return r.json();})
+        .then(function(data){
+            var box = document.getElementById('claim_results');
+            document.getElementById('claim_form_area').innerHTML = '';  // 清空表单区
+            if(!data.ok || data.items.length===0){
+                box.innerHTML = '<div class="empty" style="padding:24px;">没有匹配的待认领物品</div>';
+                return;
+            }
+            var html = '';
+            data.items.forEach(function(it, idx){
+                var photo = it.photo
+                    ? '<img class="thumb" src="/uploads/'+it.photo+'">'
+                    : '<div class="thumb-placeholder">📦</div>';
+                // 用 data-* 存信息，避免引号bug；转义特殊字符
+                html += '<div class="claim-result-row" data-idx="'+idx+'">'+
+                    photo+
+                    '<div class="info"><div class="code">'+it.code+'</div>'+
+                    '<div class="name">'+escapeHtml(it.name)+'</div>'+
+                    '<div class="meta">'+escapeHtml(it.category||'')+' · '+escapeHtml(it.found_location||'')+'</div></div>'+
+                    '<span class="btn btn-success btn-sm">认领</span></div>';
+            });
+            box.innerHTML = html;
+            // 存数据到全局，供点击取用
+            window._claimItems = data.items;
+            // 绑定点击（事件委托，避免引号问题）
+            box.querySelectorAll('.claim-result-row').forEach(function(row){
+                row.onclick = function(){
+                    var i = parseInt(this.getAttribute('data-idx'));
+                    fillClaimForm(window._claimItems[i]);
+                };
+            });
+        });
+}
+
+function escapeHtml(s){
+    if(s==null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* 选中物品 → 填入认领表单 */
+function fillClaimForm(it){
+    formDirty.claim = false;  // 选新物品，重置脏标记
+    var detailHtml =
+        '<div class="detail-panel" style="margin-bottom:16px;">'+
+        '<div><span class="code">编号 '+it.code+'</span> <span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>'+
+        '<div style="font-size:18px;font-weight:600;margin:6px 0;">'+escapeHtml(it.name)+'</div>'+
+        (it.photo?'<img class="photo-big" src="/uploads/'+it.photo+'">':'')+
+        '<div class="detail-grid">'+
+        '<div><span class="k">类别：</span><span class="v">'+escapeHtml(it.category||'—')+'</span></div>'+
+        '<div><span class="k">地点：</span><span class="v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+        '<div style="grid-column:1/-1;"><span class="k">特征（请核对）：</span><br><span class="v" style="color:#c62828;font-weight:600;">'+escapeHtml(it.description||'—')+'</span></div>'+
+        '</div></div>';
+    document.getElementById('claim_results').innerHTML = detailHtml;
+
+    var formHtml =
+        '<form method="post" action="{{ url_for('claim') }}" id="claimSubmitForm">'+
+        '<input type="hidden" name="item_id" value="'+it.id+'">'+
+        '<div class="form-row2">'+
+        '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
+        '<div class="form-group"><label>认领人电话 <span class="req">*</span></label><input type="text" name="claimer_phone" class="form-control" required></div>'+
+        '</div>'+
+        '<input type="hidden" name="operator" value="{{ current_user }}">'+
+        '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" name="feature_verified" value="1"><span>我已核对物品特征无误</span></label>'+
+        '<button type="submit" class="btn btn-success btn-block">✓ 确认认领</button>'+
+        '</form>';
+    var formArea = document.getElementById('claim_form_area');
+    formArea.innerHTML = formHtml;
+    trackForm('claim', document.getElementById('claimSubmitForm'));  // 跟踪新表单
+}
+
+/* ESC 关抽屉（带保护）*/
+document.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){
+        tryCloseDrawer('register'); tryCloseDrawer('claim');
+    }
+});
+
+/* 初始化：跟踪拾物登记表单 */
+(function(){
+    trackForm('register', document.getElementById('regDrawerForm'));
+    // 认领搜索框输入也算"操作"，但不一定算脏（搜索是查看行为），这里不标记
+})();
+</script>
 {% endblock %}
