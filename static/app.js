@@ -1,5 +1,12 @@
 /* 门诊失物招领系统 - 公共脚本 */
 
+/* ===== HTML 转义（防注入，所有页面通用）===== */
+function escapeHtml(s){
+    if(s==null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 /* ===== 消息提示（轻量，替代 alert）===== */
 function toast(msg, type) {
     type = type || "info";

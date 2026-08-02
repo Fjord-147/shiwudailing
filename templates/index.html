@@ -357,11 +357,6 @@ function searchClaim(){
         });
 }
 
-function escapeHtml(s){
-    if(s==null) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
 /* 选中物品 → 填入认领表单 */
 function fillClaimForm(it){
     formDirty.claim = false;  // 选新物品，重置脏标记

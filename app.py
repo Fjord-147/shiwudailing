@@ -644,6 +644,7 @@ def item_list():
     sql += " ORDER BY id DESC"
 
     items = db.execute(sql, params).fetchall()
+    items = [dict(r) for r in items]  # 转 dict，供模板 tojson 序列化
     return render_template("list.html", items=items, status=status,
                            q=q, date_from=date_from, date_to=date_to)
 
