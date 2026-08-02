@@ -25,11 +25,15 @@
     </div>
 </div>
 
-<div class="btn-row" style="margin-bottom:24px;">
+<div class="btn-row" style="margin-bottom:24px;flex-wrap:wrap;">
     <button class="btn" onclick="openDrawer('register')">📝 拾物登记</button>
     <button class="btn btn-success" onclick="openDrawer('claim')">🔍 认领登记</button>
     <a href="{{ url_for('item_list') }}" class="btn btn-secondary">📋 查看全部</a>
     <a href="{{ url_for('reports') }}" class="btn btn-secondary">📬 报失处理</a>
+    <form method="get" action="{{ url_for('item_list') }}" style="display:flex;gap:6px;margin-left:auto;">
+        <input type="text" name="q" class="form-control" placeholder="搜索失物编号/名称/特征..." style="min-width:220px;">
+        <button type="submit" class="btn btn-secondary">🔍 搜索</button>
+    </form>
 </div>
 
 <!-- 拾物登记抽屉 -->
@@ -460,10 +464,17 @@ document.addEventListener('keydown', function(e){
     }
 });
 
-/* 初始化：跟踪拾物登记表单 */
+/* 初始化：跟踪拾物登记表单 + 识别?claim=参数自动打开认领抽屉 */
 (function(){
     trackForm('register', document.getElementById('regDrawerForm'));
-    // 认领搜索框输入也算"操作"，但不一定算脏（搜索是查看行为），这里不标记
+    // 从总表点「认领」跳来 → 自动打开认领抽屉并定位
+    var params = new URLSearchParams(window.location.search);
+    var claimCode = params.get('claim');
+    if(claimCode){
+        openClaimForCode(claimCode);
+        // 清掉URL参数，避免刷新又弹出
+        window.history.replaceState({}, '', window.location.pathname);
+    }
 })();
 </script>
 {% endblock %}

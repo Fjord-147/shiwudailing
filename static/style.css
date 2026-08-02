@@ -875,6 +875,13 @@ table.data tbody tr { cursor: pointer; }
     line-height: 1.6;
 }
 .lv-feature .lv-k { color: #8d6e00; }
+/* 卡片右下角认领按钮 */
+.lv-action {
+    padding: 10px 16px;
+    border-top: 1px solid var(--border);
+    text-align: right;
+    background: #fafbfc;
+}
 
 /* ===== 照片放大查看器 ===== */
 .photo-zoom-overlay {

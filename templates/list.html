@@ -51,6 +51,7 @@
                     <th>状态</th>
                     <th>认领人</th>
                     <th>认领时间</th>
+                    <th>操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -70,6 +71,13 @@
                     </td>
                     <td>{{ it.claimer_name or '—' }}</td>
                     <td>{{ it.claimed_at or '—' }}</td>
+                    <td onclick="event.stopPropagation()">
+                        {% if it.status == '待认领' %}
+                            <a href="{{ url_for('index', claim=it.code) }}" class="btn btn-success btn-sm">认领</a>
+                        {% else %}
+                            <span style="color:#9ca3af;font-size:13px;">已认领</span>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -132,6 +140,10 @@ function renderCards(items){
         var statusTag = it.status==='已认领'
             ? '<span class="tag tag-returned">已认领</span>'
             : '<span class="tag tag-pending">待认领</span>';
+        // 右下角操作按钮：待认领才显示认领入口
+        var actionHtml = it.status==='待认领'
+            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
+            : '';
         // 照片：有就显示并支持点击放大，没有就显示大图标
         var photoBlock;
         if(it.photo){
@@ -171,6 +183,7 @@ function renderCards(items){
                         claimInfo+
                     '</div>'+
                 '</div>'+
+                actionHtml+
             '</div>';
     });
     grid.innerHTML = html;
