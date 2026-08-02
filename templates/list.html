@@ -21,8 +21,10 @@
             <input type="hidden" name="status" value="{{ status }}">
             <input type="text" name="q" class="form-control" placeholder="编号/名称/类别/特征"
                    value="{{ q }}">
-            <input type="date" name="date_from" class="form-control" value="{{ date_from }}" title="登记起">
-            <input type="date" name="date_to" class="form-control" value="{{ date_to }}" title="登记止">
+            <span class="date-divider">起</span>
+            <input type="text" name="date_from" class="form-control date-input" value="{{ date_from }}" placeholder="2026-07-12" title="登记起始日期，可用 - 或 / 分隔">
+            <span class="date-divider">至</span>
+            <input type="text" name="date_to" class="form-control date-input" value="{{ date_to }}" placeholder="2026-07-12" title="登记截止日期，可用 - 或 / 分隔">
             <button type="submit" class="btn btn-secondary btn-sm">筛选</button>
             <a href="{{ url_for('item_list') }}" class="btn btn-secondary btn-sm">重置</a>
             <!-- 视图切换 -->

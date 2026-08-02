@@ -443,6 +443,20 @@ table.data tbody tr { cursor: pointer; }
     align-items: center;
 }
 .search-bar .form-control { width: auto; min-width: 200px; }
+/* 日期输入框：灰色提示、固定宽度 */
+.date-input {
+    min-width: 120px !important;
+    color: #555;
+}
+.date-input::placeholder { color: #c0c4cc; }   /* 灰色占位提示 */
+.date-input:focus { color: #1f2937; }
+/* 起/至 分隔符灰色 */
+.date-divider {
+    color: #c0c4cc;
+    font-size: 14px;
+    align-self: center;
+    user-select: none;
+}
 
 .filter-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
 .filter-tab {

@@ -224,6 +224,33 @@ def parse_dt(s):
     return None
 
 
+def norm_date(s):
+    """把多种日期格式归一化为 YYYY-MM-DD（用于数据库字符串比较）。
+    支持：2026-07-12 / 2026/07/12 / 2026-7-12 / 2026/7/12 / 20260712
+    解析失败返回原值（交给后续比较，不会报错）。"""
+    if not s:
+        return ""
+    import re
+    cleaned = s.strip().replace("/", "-")
+    # 尝试 YYYY-MM-DD（含单位数月日）
+    m = re.match(r"^(\d{4})-(\d{1,2})-(\d{1,2})$", cleaned)
+    if m:
+        y, mo, d = m.groups()
+        try:
+            return f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
+        except ValueError:
+            pass
+    # 尝试 YYYYMMDD
+    m = re.match(r"^(\d{4})(\d{2})(\d{2})$", s.strip())
+    if m:
+        y, mo, d = m.groups()
+        try:
+            return f"{int(y):04d}-{int(mo):02d}-{int(d):02d}"
+        except ValueError:
+            pass
+    return s.strip()  # 解析不了就原样返回
+
+
 # ============================================================
 # 路由：管理员工作台（原首页，移到 /admin）
 # ============================================================
@@ -650,8 +677,8 @@ def item_list():
     db = get_db()
     status = request.args.get("status", "all")
     q = request.args.get("q", "").strip()
-    date_from = request.args.get("date_from", "").strip()
-    date_to = request.args.get("date_to", "").strip()
+    date_from = norm_date(request.args.get("date_from", ""))
+    date_to = norm_date(request.args.get("date_to", ""))
 
     sql = "SELECT * FROM items WHERE 1=1"
     params = []
@@ -695,9 +722,9 @@ def api_item(item_id):
 @login_required
 def stats():
     db = get_db()
-    date_from = request.args.get("date_from", "").strip() or \
+    date_from = norm_date(request.args.get("date_from", "")) or \
         date.today().replace(day=1).strftime("%Y-%m-%d")
-    date_to = request.args.get("date_to", "").strip() or \
+    date_to = norm_date(request.args.get("date_to", "")) or \
         date.today().strftime("%Y-%m-%d")
 
     base = "SELECT COUNT(*) c FROM items WHERE substr(created_at,1,10) BETWEEN ? AND ?"
@@ -729,8 +756,8 @@ def stats():
 @login_required
 def export():
     db = get_db()
-    date_from = request.args.get("date_from", "").strip()
-    date_to = request.args.get("date_to", "").strip()
+    date_from = norm_date(request.args.get("date_from", ""))
+    date_to = norm_date(request.args.get("date_to", ""))
     sql = "SELECT * FROM items WHERE 1=1"
     params = []
     if date_from:
