@@ -138,7 +138,9 @@ function showDetail(itemId) {
                 ? '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #ccc;">' +
                   '<strong>认领信息</strong><br>' +
                   '认领人：' + (it.claimer_name || "") + '　' +
-                  '电话：' + (it.claimer_phone || "") + '<br>' +
+                  '电话：' + (it.claimer_phone || "未留") + '<br>' +
+                  '人群：' + (it.claimer_group || "未选") + '　' +
+                  '性别：' + (it.claimer_gender || "未选") + '<br>' +
                   '认领时间：' + (it.claimed_at || "") + '　' +
                   '经办人：' + (it.operator || "") + '<br>' +
                   '特征已核实：' + (it.feature_verified ? "是" : "否") +

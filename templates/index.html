@@ -30,10 +30,19 @@
     <button class="btn btn-success" onclick="openDrawer('claim')">🔍 认领登记</button>
     <a href="{{ url_for('item_list') }}" class="btn btn-secondary">📋 查看全部</a>
     <a href="{{ url_for('reports') }}" class="btn btn-secondary">📬 报失处理</a>
-    <form method="get" action="{{ url_for('item_list') }}" style="display:flex;gap:6px;margin-left:auto;">
-        <input type="text" name="q" class="form-control" placeholder="搜索失物编号/名称/特征..." style="min-width:220px;">
-        <button type="submit" class="btn btn-secondary">🔍 搜索</button>
-    </form>
+    <div style="display:flex;gap:6px;margin-left:auto;">
+        <input type="text" id="dashSearch" class="form-control" placeholder="搜索失物编号/名称/特征..." style="min-width:240px;" oninput="dashSearchTimer()" onkeydown="if(event.key==='Enter'){event.preventDefault();dashSearch();}">
+        <button class="btn btn-secondary" onclick="dashSearch()">🔍 搜索</button>
+        <button class="btn btn-secondary btn-sm" onclick="clearDashSearch()" title="清除搜索">×</button>
+    </div>
+</div>
+
+<!-- 搜索结果区（搜索时显示，替换待认领清单）-->
+<div id="searchResultCard" class="card" style="display:none;">
+    <h2>🔍 搜索结果 <span id="searchCount" style="color:#6b7280;font-size:14px;font-weight:normal;"></span>
+        <button class="btn btn-secondary btn-sm" style="float:right;" onclick="clearDashSearch()">✕ 关闭搜索</button>
+    </h2>
+    <div id="searchResultList" class="item-list"></div>
 </div>
 
 <!-- 拾物登记抽屉 -->
@@ -140,7 +149,7 @@
 <!-- 登记成功提醒（自动15秒消失）-->
 <div id="regNotice" class="flash success" style="display:none;margin-bottom:16px;"></div>
 
-<div class="card">
+<div class="card" id="pendingCard">
     <h2>待认领清单（最近 <span id="pendingCount">{{ pending_items|length }}</span> 件）</h2>
     <div id="pendingList" class="item-list">
         {% if pending_items %}
@@ -174,6 +183,55 @@
 
 {% block script %}
 <script>
+/* ===== 工作台就地搜索（不跳转）===== */
+var _dashSearchTimer = null;
+function dashSearchTimer(){
+    clearTimeout(_dashSearchTimer);
+    _dashSearchTimer = setTimeout(dashSearch, 350);  // 输入停顿350ms后搜
+}
+function dashSearch(){
+    var q = document.getElementById('dashSearch').value.trim();
+    if(!q){ clearDashSearch(); return; }
+    fetch("{{ url_for('search_api') }}?q="+encodeURIComponent(q))
+        .then(function(r){return r.json();})
+        .then(function(data){
+            if(!data.ok) return;
+            var box = document.getElementById('searchResultList');
+            document.getElementById('searchCount').textContent = '('+data.items.length+' 条)';
+            document.getElementById('searchResultCard').style.display = 'block';
+            document.getElementById('pendingCard').style.display = 'none';
+            if(data.items.length===0){
+                box.innerHTML = '<div class="empty">没有匹配“'+escapeHtml(q)+'”的物品</div>';
+                return;
+            }
+            var html = '';
+            data.items.forEach(function(it){
+                var photo = it.photo
+                    ? '<img class="thumb" src="/uploads/'+it.photo+'">'
+                    : '<div class="thumb-placeholder">📦</div>';
+                var statusTag = it.status==='待认领'
+                    ? '<span class="tag tag-pending">待认领</span>'
+                    : '<span class="tag tag-returned">已认领</span>';
+                var actionBtn = it.status==='待认领'
+                    ? '<button class="btn btn-success btn-sm" onclick="event.stopPropagation();openClaimForCode(\''+it.code+'\')">认领</button>'
+                    : '<span style="color:#9ca3af;font-size:13px;">已认领</span>';
+                html += '<div class="item-row" onclick="openClaimForCode(\''+it.code+'\')">'+
+                    photo+
+                    '<div class="info"><div class="code">编号 '+it.code+'</div>'+
+                    '<div class="name">'+escapeHtml(it.name)+'　'+statusTag+'</div>'+
+                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'—')+' · '+escapeHtml(it.found_time||'')+'</div></div>'+
+                    '<div class="actions">'+actionBtn+'</div>'+
+                    '</div>';
+            });
+            box.innerHTML = html;
+        });
+}
+function clearDashSearch(){
+    document.getElementById('dashSearch').value = '';
+    document.getElementById('searchResultCard').style.display = 'none';
+    document.getElementById('pendingCard').style.display = 'block';
+}
+
 /* ===== 拾物登记 AJAX 提交（不跳大屏，留工作台弹提醒）===== */
 function submitRegister(e){
     e.preventDefault();  // 阻止默认整页提交
@@ -364,6 +422,7 @@ function searchClaim(){
 /* 选中物品 → 填入认领表单 */
 function fillClaimForm(it){
     formDirty.claim = false;  // 选新物品，重置脏标记
+    _phoneConfirmed = false;  // 重置电话确认标记
     var detailHtml =
         '<div class="detail-panel" style="margin-bottom:16px;">'+
         '<div><span class="code">编号 '+it.code+'</span> <span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>'+
@@ -381,7 +440,15 @@ function fillClaimForm(it){
         '<input type="hidden" name="item_id" value="'+it.id+'">'+
         '<div class="form-row2">'+
         '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
-        '<div class="form-group"><label>认领人电话 <span class="req">*</span></label><input type="text" name="claimer_phone" class="form-control" required></div>'+
+        '<div class="form-group"><label>认领人电话</label><input type="text" name="claimer_phone" class="form-control" placeholder="选填，不填将提示确认"></div>'+
+        '</div>'+
+        '<div class="form-row2">'+
+        '<div class="form-group"><label>人群</label><select name="claimer_group" class="form-control">'+
+            '<option value="">请选择</option><option value="老人">老人</option><option value="小孩">小孩</option><option value="青年">青年</option><option value="中年">中年</option><option value="其他">其他</option>'+
+        '</select></div>'+
+        '<div class="form-group"><label>性别</label><select name="claimer_gender" class="form-control">'+
+            '<option value="">请选择</option><option value="男">男士</option><option value="女">女士</option>'+
+        '</select></div>'+
         '</div>'+
         '<input type="hidden" name="operator" value="{{ current_user }}">'+
         '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" name="feature_verified" value="1"><span>我已核对物品特征无误</span></label>'+
@@ -412,9 +479,18 @@ function fillClaimForm(it){
 }
 
 /* 认领 AJAX 提交（和登记一样，留工作台弹提醒）*/
+var _phoneConfirmed = false;  // 电话确认标记，避免反复弹窗
 function submitClaim(e){
     e.preventDefault();
     var form = document.getElementById('claimSubmitForm');
+    var phone = form.querySelector('[name="claimer_phone"]').value.trim();
+    // 未填电话 → 弹提示确认（确认后不再弹）
+    if(!phone && !_phoneConfirmed){
+        if(!confirm('未填写联系电话，后续可能无法联系认领人。\n建议尽量填写。确定要不填电话继续吗？')){
+            return;  // 取消，不提交
+        }
+        _phoneConfirmed = true;
+    }
     var fd = new FormData(form);
     // 文件上传和拍照base64同时存在时，优先用拍照（清掉file），避免重复
     var photoData = document.getElementById('cphoto_data').value;
@@ -432,6 +508,7 @@ function submitClaim(e){
         }
         // 成功：关抽屉、刷新列表、弹提醒
         formDirty.claim = false;
+        _phoneConfirmed = false;
         closeDrawer('claim');
         refreshPending();
         showClaimNotice(data.msg);

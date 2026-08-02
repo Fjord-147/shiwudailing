@@ -76,7 +76,9 @@ def init_db():
             claimed_at     TEXT,                   -- 认领时间
             operator       TEXT,                   -- 经办人
             hide_photo     INTEGER DEFAULT 0,      -- 1=敏感物品，公众界面隐藏照片
-            claimer_photo  TEXT                    -- 认领人照片（可选，老人等记不清电话时备查）
+            claimer_photo  TEXT,                   -- 认领人照片（可选，老人等记不清电话时备查）
+            claimer_group  TEXT,                   -- 认领人群：老人/小孩/青年/其他
+            claimer_gender TEXT                    -- 认领人性别：男/女
         )
     """)
     # 兼容旧库：若表已存在但缺字段，自动补上
@@ -85,6 +87,10 @@ def init_db():
         conn.execute("ALTER TABLE items ADD COLUMN hide_photo INTEGER DEFAULT 0")
     if "claimer_photo" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN claimer_photo TEXT")
+    if "claimer_group" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN claimer_group TEXT")
+    if "claimer_gender" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN claimer_gender TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -499,6 +505,23 @@ def pending_api():
     return jsonify({"ok": True, "items": [dict(r) for r in items]})
 
 
+@app.route("/api/search")
+@login_required
+def search_api():
+    """工作台就地搜索：按编号/名称/特征搜（含待认领和已认领）。"""
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    if not q:
+        return jsonify({"ok": True, "items": []})
+    items = db.execute(
+        """SELECT * FROM items
+           WHERE code LIKE ? OR name LIKE ? OR description LIKE ? OR category LIKE ?
+           ORDER BY id DESC LIMIT 30""",
+        (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%")
+    ).fetchall()
+    return jsonify({"ok": True, "items": [dict(r) for r in items]})
+
+
 # ============================================================
 # 路由：认领登记
 # ============================================================
@@ -510,6 +533,8 @@ def claim():
         item_id = request.form.get("item_id")
         claimer_name = request.form.get("claimer_name", "").strip()
         claimer_phone = request.form.get("claimer_phone", "").strip()
+        claimer_group = request.form.get("claimer_group", "").strip()   # 人群
+        claimer_gender = request.form.get("claimer_gender", "").strip() # 性别
         feature_verified = 1 if request.form.get("feature_verified") else 0
         operator = request.form.get("operator", "").strip()
         if operator == "__other__":
@@ -554,9 +579,10 @@ def claim():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.execute(
             """UPDATE items SET status='已认领', claimer_name=?, claimer_phone=?,
-               feature_verified=?, claimed_at=?, operator=?, claimer_photo=? WHERE id=?""",
+               feature_verified=?, claimed_at=?, operator=?, claimer_photo=?,
+               claimer_group=?, claimer_gender=? WHERE id=?""",
             (claimer_name, claimer_phone, feature_verified, now, operator,
-             claimer_photo, item_id)
+             claimer_photo, claimer_group or None, claimer_gender or None, item_id)
         )
         db.commit()
         msg = f"认领登记完成：{item['code']} 已归还给 {claimer_name}"
