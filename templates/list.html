@@ -81,7 +81,7 @@
 
     <!-- 卡片视图 -->
     <div id="cardView" style="display:none;">
-        <div class="card-grid" id="cardGrid"></div>
+        <div class="lv-grid" id="cardGrid"></div>
         <div class="empty" id="cardEmpty" style="display:none;">没有符合条件的记录</div>
     </div>
 </div>
@@ -94,14 +94,14 @@
 <script>
 /* ===== 类别 → 图标 + 边框颜色 映射 ===== */
 var CATEGORY_STYLE = {
-    "证件":        {icon: "🪪", color: "#c62828", bg: "#fdecea"},
-    "钱包":        {icon: "👛", color: "#c62828", bg: "#fdecea"},
-    "手机/电子产品":{icon: "📱", color: "#1f2937", bg: "#f3f4f6"},
-    "钥匙":        {icon: "🔑", color: "#1f2937", bg: "#f3f4f6"},
-    "病历/检查单":  {icon: "📄", color: "#555555", bg: "#fafafa"},
-    "衣物":        {icon: "👕", color: "#1565c0", bg: "#e8f0fe"},
-    "水杯/雨伞":   {icon: "☂️", color: "#2e7d32", bg: "#e8f5e9"},
-    "其他":        {icon: "📦", color: "#6b7280", bg: "#f5f5f5"}
+    "证件":        {icon: "🪪", color: "#c62828"},
+    "钱包":        {icon: "👛", color: "#c62828"},
+    "手机/电子产品":{icon: "📱", color: "#1f2937"},
+    "钥匙":        {icon: "🔑", color: "#1f2937"},
+    "病历/检查单":  {icon: "📄", color: "#555555"},
+    "衣物":        {icon: "👕", color: "#1565c0"},
+    "水杯/雨伞":   {icon: "☂️", color: "#2e7d32"},
+    "其他":        {icon: "📦", color: "#6b7280"}
 };
 function getCatStyle(cat){
     return CATEGORY_STYLE[cat] || CATEGORY_STYLE["其他"];
@@ -116,7 +116,7 @@ function switchView(view){
     localStorage.setItem('lf_list_view', view);
 }
 
-/* ===== 渲染卡片 ===== */
+/* ===== 渲染卡片（信息直接平铺，不用点开）===== */
 function renderCards(items){
     var grid = document.getElementById('cardGrid');
     var emptyBox = document.getElementById('cardEmpty');
@@ -129,34 +129,98 @@ function renderCards(items){
     var html = '';
     items.forEach(function(it){
         var st = getCatStyle(it.category);
-        var photoHtml = it.photo
-            ? '<img src="/uploads/'+it.photo+'">'
-            : '<div class="lv-photo-placeholder">'+st.icon+'</div>';
         var statusTag = it.status==='已认领'
             ? '<span class="tag tag-returned">已认领</span>'
             : '<span class="tag tag-pending">待认领</span>';
+        // 照片：有就显示并支持点击放大，没有就显示大图标
+        var photoBlock;
+        if(it.photo){
+            photoBlock = '<div class="lv-photo" onclick="event.stopPropagation();openPhotoZoom(\'/uploads/'+it.photo+'\')">'+
+                         '<img src="/uploads/'+it.photo+'">'+
+                         '<span class="lv-zoom-hint">🔍 点击放大</span></div>';
+        } else {
+            photoBlock = '<div class="lv-photo lv-photo-none"><span>'+st.icon+'</span></div>';
+        }
+        // 认领信息（已认领才显示）
+        var claimInfo = '';
+        if(it.status==='已认领'){
+            claimInfo = '<div class="lv-row"><span class="lv-k">认领人：</span><span class="lv-v">'+
+                escapeHtml(it.claimer_name||'—')+'</span></div>'+
+                '<div class="lv-row"><span class="lv-k">认领时间：</span><span class="lv-v">'+
+                escapeHtml(it.claimed_at||'—')+'</span></div>';
+        }
         html +=
-            '<div class="lv-card" style="border-color:'+st.color+';background:'+st.bg+';" onclick="showDetail('+it.id+')">'+
-                '<div class="lv-card-icon" style="color:'+st.color+';">'+st.icon+'</div>'+
-                '<div class="lv-card-photo">'+photoHtml+'</div>'+
-                '<div class="lv-card-body">'+
-                    '<div class="lv-card-name">'+escapeHtml(it.name)+'</div>'+
-                    '<div class="lv-card-meta">'+statusTag+' '+escapeHtml(it.category||'未分类')+'</div>'+
-                    '<div class="lv-card-sub">编号 '+it.code+'</div>'+
-                    '<div class="lv-card-sub">📍 '+escapeHtml(it.found_location||'—')+'</div>'+
-                    '<div class="lv-card-sub">⏰ '+escapeHtml(it.found_time||'—')+'</div>'+
+            '<div class="lv-card" style="border-color:'+st.color+';">'+
+                '<div class="lv-card-main">'+
+                    photoBlock+
+                    '<div class="lv-info">'+
+                        '<div class="lv-line1">'+
+                            '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
+                            '<span class="lv-cat-icon" style="color:'+st.color+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
+                            statusTag+
+                        '</div>'+
+                        '<div class="lv-name-row">'+
+                            '<span class="lv-cat-label">类别：</span>'+
+                            '<span class="lv-cat-val">'+st.icon+' '+escapeHtml(it.category||'未分类')+'</span>'+
+                        '</div>'+
+                        '<div class="lv-row"><span class="lv-k">捡到地点：</span><span class="lv-v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+                        '<div class="lv-row"><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
+                        '<div class="lv-row"><span class="lv-k">登记时间：</span><span class="lv-v">'+escapeHtml(it.created_at||'—')+'</span></div>'+
+                        '<div class="lv-row"><span class="lv-k">捡到人：</span><span class="lv-v">'+escapeHtml(it.founder||'—')+'</span></div>'+
+                        '<div class="lv-feature"><span class="lv-k">特征：</span>'+escapeHtml(it.description||'—')+'</div>'+
+                        claimInfo+
+                    '</div>'+
                 '</div>'+
             '</div>';
     });
     grid.innerHTML = html;
 }
 
+/* ===== 照片放大查看（可缩放）===== */
+var _zoomScale = 1;
+function openPhotoZoom(src){
+    _zoomScale = 1;
+    var overlay = document.createElement('div');
+    overlay.className = 'photo-zoom-overlay';
+    overlay.id = 'photoZoomOverlay';
+    overlay.onclick = function(e){ if(e.target===overlay) closePhotoZoom(); };
+    overlay.innerHTML =
+        '<div class="photo-zoom-bar">'+
+            '<button onclick="zoomPhoto(-0.2)">➖</button>'+
+            '<span id="zoomLabel">100%</span>'+
+            '<button onclick="zoomPhoto(0.2)">➕</button>'+
+            '<button onclick="zoomReset()">⟲</button>'+
+            '<button onclick="closePhotoZoom()" class="close-zoom">✕ 关闭</button>'+
+        '</div>'+
+        '<div class="photo-zoom-stage" id="zoomStage">'+
+            '<img src="'+src+'" id="zoomImg" onclick="event.stopPropagation()" '+
+            'onwheel="event.preventDefault();zoomPhoto(event.deltaY<0?0.15:-0.15);">'+
+        '</div>';
+    document.body.appendChild(overlay);
+}
+function zoomPhoto(delta){
+    _zoomScale = Math.max(0.2, Math.min(5, _zoomScale + delta));
+    applyZoom();
+}
+function zoomReset(){ _zoomScale = 1; applyZoom(); }
+function applyZoom(){
+    var img = document.getElementById('zoomImg');
+    if(img){ img.style.transform = 'scale('+_zoomScale+')'; }
+    var label = document.getElementById('zoomLabel');
+    if(label){ label.textContent = Math.round(_zoomScale*100)+'%'; }
+}
+function closePhotoZoom(){
+    var o = document.getElementById('photoZoomOverlay');
+    if(o) o.remove();
+}
+document.addEventListener('keydown', function(e){
+    if(e.key==='Escape') closePhotoZoom();
+});
+
 /* ===== 初始化 ===== */
 (function(){
-    // 读取记忆的视图
     var saved = localStorage.getItem('lf_list_view') || 'table';
     switchView(saved);
-    // 渲染卡片数据
     var items = JSON.parse(document.getElementById('itemsData').textContent);
     renderCards(items);
 })();
