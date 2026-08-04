@@ -28,7 +28,7 @@
     {% for it in items %}
     <div class="goods-card" onclick="showPublicDetail({{ it.id }})">
         <div class="goods-photo">
-            {% if it.photo and not it.hide_photo %}
+            {% if it.has_public_photo %}
                 <img src="{{ url_for('public_photo', item_id=it.id) }}">
             {% else %}
                 <div class="goods-photo-placeholder">📦</div>
@@ -63,10 +63,16 @@ function showPublicDetail(itemId) {
         .then(function(data){
             if(!data.ok){toast("读取失败","error");return;}
             var it = data.item;
-            // 后端已对 hide_photo 的物品清空了 photo 字段
-            var photoHtml = it.photo
-                ? '<img class="photo-big" src="/public/photo/' + it.id + '">'
-                : '<div style="color:#999;margin:10px 0;">（未提供照片，请到导医台查看实物）</div>';
+            // 后端返回 photos 数组（已过滤隐藏的照片）
+            var photos = it.photos || [];
+            var photoHtml;
+            if(photos.length > 0){
+                photoHtml = '<div class="detail-photos">' + photos.map(function(p, i){
+                    return '<img class="photo-big" src="/public/photo/'+it.id+'/'+i+'">';
+                }).join('') + '</div>';
+            } else {
+                photoHtml = '<div style="color:#999;margin:10px 0;">（未提供照片，请到导医台查看实物）</div>';
+            }
             var html =
                 '<div class="detail-panel" style="margin:0;">' +
                 '<div><span class="code" style="color:#666;font-size:13px;">编号 ' + it.code + '</span>' +

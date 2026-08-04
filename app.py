@@ -79,7 +79,8 @@ def init_db():
             claimer_photo  TEXT,                   -- 认领人照片（可选，老人等记不清电话时备查）
             claimer_group  TEXT,                   -- 认领人群：老人/小孩/青年/其他
             claimer_gender TEXT,                   -- 认领人性别：男/女
-            storage_location TEXT                  -- 存放位置（如导诊台2号抽屉）
+            storage_location TEXT,                 -- 存放位置（如导诊台2号抽屉）
+            hidden_photos TEXT                     -- 隐藏的照片文件名（逗号分隔，公众看不到）
         )
     """)
     # 兼容旧库：若表已存在但缺字段，自动补上
@@ -94,6 +95,8 @@ def init_db():
         conn.execute("ALTER TABLE items ADD COLUMN claimer_gender TEXT")
     if "storage_location" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN storage_location TEXT")
+    if "hidden_photos" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN hidden_photos TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -309,7 +312,15 @@ def public_index():
         sql += " AND category=?"
         params.append(cat)
     sql += " ORDER BY id DESC"
-    items = db.execute(sql, params).fetchall()
+    rows = db.execute(sql, params).fetchall()
+    # 算出每条是否有"非隐藏照片"供模板判断
+    items = []
+    for r in rows:
+        d = dict(r)
+        all_photos = [p.strip() for p in (d.get("photo") or "").split(",") if p.strip()]
+        hidden = set(p.strip() for p in (d.get("hidden_photos") or "").split(",") if p.strip())
+        d["has_public_photo"] = any(p not in hidden for p in all_photos)
+        items.append(d)
     return render_template("public_index.html", items=items, q=q, cat=cat)
 
 
@@ -426,36 +437,55 @@ def reports():
 # ============================================================
 @app.route("/public/photo/<int:item_id>")
 def public_photo(item_id):
-    """公众访问的物品照片：若 hide_photo=1 或无照片，返回占位图，隐私由服务端强制。"""
-    db = get_db()
-    row = db.execute("SELECT photo, hide_photo FROM items WHERE id=?", (item_id,)).fetchone()
-    if not row or not row["photo"] or row["hide_photo"]:
-        # 返回占位图（1x1 透明 png，避免404破坏布局）
-        import base64
-        placeholder = base64.b64decode(
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
-        )
-        from flask import Response
-        return Response(placeholder, mimetype="image/png")
-    return send_from_directory(config.UPLOAD_FOLDER, row["photo"])
+    """公众访问物品照片（兼容旧前端）：返回第一张非隐藏照片。"""
+    return public_photo_idx(item_id, 0)
 
 
 @app.route("/public/item/<int:item_id>")
 def public_item(item_id):
-    """公众版物品详情：只返回非隐私字段（不含认领人姓名/电话等），且尊重 hide_photo。"""
+    """公众版物品详情：只返回非隐私字段，照片过滤掉隐藏的。"""
     db = get_db()
     row = db.execute(
         "SELECT id, code, name, category, description, found_location, "
-        "found_time, photo, hide_photo, status FROM items WHERE id=?",
+        "found_time, photo, hidden_photos, status FROM items WHERE id=?",
         (item_id,)
     ).fetchone()
     if not row:
         return jsonify({"ok": False}), 404
     d = dict(row)
-    # 隐藏照片的，对外不暴露 photo 字段（前端据此显示"请到导医台查看实物"）
-    if d.get("hide_photo"):
-        d["photo"] = None
+    # 过滤掉隐藏的照片，只把可公开的照片列表给前端
+    all_photos = [p.strip() for p in (d.get("photo") or "").split(",") if p.strip()]
+    hidden = set(p.strip() for p in (d.get("hidden_photos") or "").split(",") if p.strip())
+    public_photos = [p for p in all_photos if p not in hidden]
+    d["photos"] = public_photos   # 公众可见的照片列表
+    d["photo"] = public_photos[0] if public_photos else None  # 兼容旧前端取首张
+    d.pop("hidden_photos", None)  # 不暴露隐藏信息
     return jsonify({"ok": True, "item": d})
+
+
+@app.route("/public/photo/<int:item_id>/<int:idx>")
+def public_photo_idx(item_id, idx):
+    """公众访问某张照片：按序号取该物品的非隐藏照片，越界或隐藏返回占位图。"""
+    db = get_db()
+    row = db.execute("SELECT photo, hidden_photos FROM items WHERE id=?", (item_id,)).fetchone()
+    if not row:
+        return _placeholder_img()
+    all_photos = [p.strip() for p in (row["photo"] or "").split(",") if p.strip()]
+    hidden = set(p.strip() for p in (row["hidden_photos"] or "").split(",") if p.strip())
+    public_photos = [p for p in all_photos if p not in hidden]
+    if idx < 0 or idx >= len(public_photos):
+        return _placeholder_img()
+    return send_from_directory(config.UPLOAD_FOLDER, public_photos[idx])
+
+
+def _placeholder_img():
+    """返回1x1透明PNG占位图。"""
+    import base64
+    from flask import Response
+    placeholder = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+    )
+    return Response(placeholder, mimetype="image/png")
 
 
 # ============================================================
@@ -507,17 +537,24 @@ def register():
                     photo_files.append(fname)
         photo_path = ",".join(photo_files) if photo_files else None
 
+        # 解析隐藏的照片序号（前端按 后端顺序 传：先file后data），算出隐藏的文件名
+        hidden_photos_set = set()
+        for idx_str in request.form.get("hidden_photo_idx", "").split(","):
+            idx_str = idx_str.strip()
+            if idx_str.isdigit() and int(idx_str) < len(photo_files):
+                hidden_photos_set.add(photo_files[int(idx_str)])
+        hidden_photos = ",".join(sorted(hidden_photos_set)) if hidden_photos_set else None
+
         code = generate_code(db)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        hide_photo = 1 if request.form.get("hide_photo") else 0
         db.execute(
             """INSERT INTO items
                (code, name, category, description, photo, found_location,
-                found_time, founder, status, created_at, hide_photo, storage_location)
-               VALUES (?,?,?,?,?,?,?,?,'待认领',?,?,?)""",
+                found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos)
+               VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?)""",
             (code, name, category, description, photo_path,
              found_location or None, found_time or None, founder or None,
-             now, hide_photo, storage_location or None)
+             now, storage_location or None, hidden_photos)
         )
         db.commit()
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页

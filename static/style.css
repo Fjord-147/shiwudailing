@@ -1027,6 +1027,42 @@ table.data tbody tr { cursor: pointer; }
     justify-content: center;
 }
 .mp-del:hover { background: #c62828; }
+/* 单张照片隐藏锁按钮 */
+.mp-lock {
+    position: absolute;
+    bottom: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.85);
+    color: #555;
+    border: 1px solid var(--border);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.mp-lock:hover { background: #fff; }
+/* 已隐藏的照片缩略图：蒙灰 */
+.mp-thumb-hidden img { opacity: .35; }
+.mp-thumb-hidden { position: relative; }
+.mp-thumb-hidden::after {
+    content: '已隐藏';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    font-size: 11px;
+    color: #c62828;
+    font-weight: 600;
+    background: rgba(255,255,255,.9);
+    padding: 1px 5px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
 
 /* 详情弹窗多图横向排列 */
 .detail-photos {

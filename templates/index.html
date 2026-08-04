@@ -94,15 +94,8 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
-                    <label>存放位置 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（物品放在哪，方便后续取）</span></label>
-                    <input type="text" name="storage_location" class="form-control" placeholder="如：导诊台2号抽屉、3号柜" list="storage_list">
-                    <datalist id="storage_list">
-                        <option value="导诊台1号抽屉">
-                        <option value="导诊台2号抽屉">
-                        <option value="导诊台3号抽屉">
-                        <option value="失物柜A">
-                        <option value="失物柜B">
-                    </datalist>
+                    <label>存放位置</label>
+                    <input type="text" name="storage_location" class="form-control" placeholder="如：导诊台2号抽屉、3号柜">
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label>物品照片 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（可传多张，一张拍不全可多拍）</span></label>
@@ -122,13 +115,10 @@
                         </div>
                         <!-- 已选照片缩略图列表 -->
                         <div class="multi-photo-list" id="drphoto_thumbs"></div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:6px;">💡 点缩略图左下角 🔒 可隐藏单张照片（含证件等敏感图，公众看不到）</div>
                         <input type="hidden" name="photo_data" id="drphoto_data">
                     </div>
                 </div>
-                <label class="checkbox-row" style="margin-bottom:18px;">
-                    <input type="checkbox" name="hide_photo" value="1">
-                    <span>🔒 隐藏照片（证件、医保卡等敏感物品）</span>
-                </label>
                 <div class="btn-row">
                     <button type="submit" class="btn btn-block">✓ 提交登记</button>
                 </div>
@@ -202,12 +192,20 @@ function renderRegThumbs(){
     if(_regPhotos.length === 0){ box.innerHTML=''; return; }
     var html = '';
     _regPhotos.forEach(function(p, i){
-        html += '<div class="mp-thumb">'+
+        var hdn = p.hidden ? 'mp-thumb-hidden' : '';
+        var lock = p.hidden ? '🔒' : '🔓';
+        var lockTitle = p.hidden ? '已隐藏（公众看不到），点击取消' : '公众可见，点击隐藏（含证件等敏感图）';
+        html += '<div class="mp-thumb '+hdn+'">'+
             '<img src="'+p.preview+'">'+
             '<button type="button" class="mp-del" onclick="event.preventDefault();removeRegPhoto('+i+')">×</button>'+
+            '<button type="button" class="mp-lock" title="'+lockTitle+'" onclick="event.preventDefault();toggleHidePhoto('+i+')">'+lock+'</button>'+
             '</div>';
     });
     box.innerHTML = html;
+}
+function toggleHidePhoto(i){
+    _regPhotos[i].hidden = !_regPhotos[i].hidden;
+    renderRegThumbs();
 }
 function addCapturePhoto(videoId){
     var video = document.getElementById(videoId);
@@ -236,14 +234,29 @@ function removeRegPhoto(i){
     _regPhotos.splice(i, 1);
     renderRegThumbs();
 }
-// 提交前：把 _regPhotos 整理进 FormData
+// 提交前：把 _regPhotos 整理进 FormData（保持后端顺序：先file后data，记录隐藏序号）
 function collectPhotosToForm(fd){
     var dataParts = [];
+    var hiddenIdx = [];
+    var idx = 0;  // 后端最终序号：先所有file，再所有data
+    // 先处理上传文件（与后端 getlist 顺序一致）
     _regPhotos.forEach(function(p){
-        if(p.type==='data'){ dataParts.push(p.val); }
-        else if(p.type==='file'){ fd.append('photo_file', p.file); }
+        if(p.type === 'file'){
+            fd.append('photo_file', p.file);
+            if(p.hidden) hiddenIdx.push(idx);
+            idx++;
+        }
+    });
+    // 再处理拍照 base64
+    _regPhotos.forEach(function(p){
+        if(p.type === 'data'){
+            dataParts.push(p.val);
+            if(p.hidden) hiddenIdx.push(idx);
+            idx++;
+        }
     });
     fd.set('photo_data', dataParts.join('|||'));
+    fd.set('hidden_photo_idx', hiddenIdx.join(','));
     return fd;
 }
 
