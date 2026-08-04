@@ -94,8 +94,9 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
-                    <label>存放位置</label>
-                    <input type="text" name="storage_location" class="form-control" placeholder="如：导诊台2号抽屉、3号柜">
+                    <label>存放位置 <span class="req">*</span></label>
+                    <input type="text" name="storage_location" id="storageInput" class="form-control" placeholder="如：导诊台2号抽屉、3号柜" oninput="checkStorage()">
+                    <div class="field-tip" id="storageTip" style="display:none;">请填写存放位置，方便后续取物</div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
                     <label>物品照片 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（可传多张，一张拍不全可多拍）</span></label>
@@ -310,8 +311,21 @@ function clearDashSearch(){
 }
 
 /* ===== 拾物登记 AJAX 提交（不跳大屏，留工作台弹提醒）===== */
+function checkStorage(){
+    var v = document.getElementById('storageInput').value.trim();
+    var tip = document.getElementById('storageTip');
+    tip.style.display = v ? 'none' : 'block';
+}
 function submitRegister(e){
     e.preventDefault();  // 阻止默认整页提交
+    // 存放位置必填校验
+    var storage = document.getElementById('storageInput');
+    if(!storage.value.trim()){
+        document.getElementById('storageTip').style.display = 'block';
+        storage.focus();
+        toast('请填写存放位置', 'error');
+        return;
+    }
     var form = document.getElementById('regDrawerForm');
     var fd = new FormData(form);
     // 整理多照片（拍拍的走base64，上传的走文件）
@@ -508,6 +522,13 @@ function searchClaim(){
         });
 }
 
+/* 生成当前时刻的 datetime-local 字符串（YYYY-MM-DDTHH:MM）*/
+function nowLocalStr(){
+    var d = new Date();
+    var pad = function(n){ return n<10?'0'+n:n; };
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+
 /* 选中物品 → 填入认领表单 */
 function fillClaimForm(it){
     formDirty.claim = false;  // 选新物品，重置脏标记
@@ -538,6 +559,8 @@ function fillClaimForm(it){
         '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
         '<div class="form-group"><label>认领人电话</label><input type="text" name="claimer_phone" class="form-control" placeholder="选填，不填将提示确认"></div>'+
         '</div>'+
+        '<div class="form-group" style="margin-bottom:14px;"><label>认领时间</label>'+
+        '<input type="datetime-local" name="claimed_at" class="form-control" value="'+nowLocalStr()+'"></div>'+
         '<div class="form-row2">'+
         '<div class="form-group"><label>人群</label><select name="claimer_group" class="form-control">'+
             '<option value="">请选择</option><option value="老人">老人</option><option value="小孩">小孩</option><option value="青年">青年</option><option value="中年">中年</option><option value="其他">其他</option>'+

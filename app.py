@@ -510,7 +510,14 @@ def register():
         storage_location = request.form.get("storage_location", "").strip()
 
         if not name:
+            if _is_ajax():
+                return jsonify({"ok": False, "msg": "请填写物品名称。"})
             flash("请填写物品名称。", "error")
+            return redirect(url_for("register"))
+        if not storage_location:
+            if _is_ajax():
+                return jsonify({"ok": False, "msg": "请填写存放位置，方便后续取物。"})
+            flash("请填写存放位置。", "error")
             return redirect(url_for("register"))
 
         # 处理照片（支持多张，最终存逗号分隔的文件名）
@@ -654,7 +661,13 @@ def claim():
             cp_file.save(os.path.join(config.UPLOAD_FOLDER, fname))
             claimer_photo = fname
 
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # 认领时间：优先用前端传的 claimed_at（可手改），否则用当前时刻
+        claimed_at_raw = request.form.get("claimed_at", "").strip()
+        if claimed_at_raw:
+            dt = parse_dt(claimed_at_raw.replace("T", " "))  # datetime-local 格式
+            now = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.execute(
             """UPDATE items SET status='已认领', claimer_name=?, claimer_phone=?,
                feature_verified=?, claimed_at=?, operator=?, claimer_photo=?,
