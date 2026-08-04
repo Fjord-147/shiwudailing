@@ -1146,6 +1146,13 @@ table.data tbody tr { cursor: pointer; }
     min-width: 50px;
     text-align: center;
 }
+.photo-zoom-bar #zoomCount {
+    font-size: 13px;
+    color: rgba(255,255,255,.8);
+    margin: 0 8px;
+    min-width: 40px;
+    text-align: center;
+}
 .photo-zoom-stage {
     flex: 1;
     overflow: auto;
