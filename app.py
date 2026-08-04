@@ -729,6 +729,84 @@ def api_item(item_id):
     return jsonify({"ok": True, "item": dict(row)})
 
 
+def _remove_photos(*fnames):
+    """安全删除照片文件（忽略不存在）。"""
+    import os as _os
+    for fn in fnames:
+        if not fn:
+            continue
+        # photo 字段可能是逗号分隔的多张
+        for one in str(fn).split(","):
+            one = one.strip()
+            if one:
+                try:
+                    _os.remove(os.path.join(config.UPLOAD_FOLDER, one))
+                except OSError:
+                    pass
+
+
+@app.route("/api/item/<int:item_id>/unclaim", methods=["POST"])
+@login_required
+def api_unclaim(item_id):
+    """撤销认领：状态退回待认领，清空认领信息，删认领人照片。"""
+    db = get_db()
+    if request.form.get("confirm", "").strip() != "确认":
+        return jsonify({"ok": False, "msg": "请输入“确认”二字以执行撤销。"})
+    item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        return jsonify({"ok": False, "msg": "物品不存在。"})
+    db.execute(
+        """UPDATE items SET status='待认领', claimer_name=NULL, claimer_phone=NULL,
+           claimer_group=NULL, claimer_gender=NULL, claimed_at=NULL, operator=NULL,
+           feature_verified=0, claimer_photo=NULL WHERE id=?""",
+        (item_id,)
+    )
+    db.commit()
+    _remove_photos(item["claimer_photo"])  # 删认领人照片
+    return jsonify({"ok": True, "msg": f"已撤销认领：{item['code']} 退回待认领。"})
+
+
+@app.route("/api/item/<int:item_id>/delete", methods=["POST"])
+@login_required
+def api_delete(item_id):
+    """删除整条记录（含照片）。"""
+    db = get_db()
+    if request.form.get("confirm", "").strip() != "确认":
+        return jsonify({"ok": False, "msg": "请输入“确认”二字以执行删除。"})
+    item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        return jsonify({"ok": False, "msg": "物品不存在。"})
+    _remove_photos(item["photo"], item["claimer_photo"])  # 删物品照片+认领人照片
+    db.execute("DELETE FROM items WHERE id=?", (item_id,))
+    db.commit()
+    return jsonify({"ok": True, "msg": f"已删除记录：{item['code']} {item['name']}。"})
+
+
+@app.route("/api/item/<int:item_id>/edit-claim", methods=["POST"])
+@login_required
+def api_edit_claim(item_id):
+    """修改认领信息（姓名/电话/人群/性别），不改状态和物品本身。"""
+    db = get_db()
+    item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        return jsonify({"ok": False, "msg": "物品不存在。"})
+    if item["status"] != "已认领":
+        return jsonify({"ok": False, "msg": "该物品尚未认领，无法修改认领信息。"})
+    name = request.form.get("claimer_name", "").strip()
+    phone = request.form.get("claimer_phone", "").strip()
+    group = request.form.get("claimer_group", "").strip()
+    gender = request.form.get("claimer_gender", "").strip()
+    if not name:
+        return jsonify({"ok": False, "msg": "认领人姓名不能为空。"})
+    db.execute(
+        """UPDATE items SET claimer_name=?, claimer_phone=?, claimer_group=?, claimer_gender=?
+           WHERE id=?""",
+        (name, phone or None, group or None, gender or None, item_id)
+    )
+    db.commit()
+    return jsonify({"ok": True, "msg": "认领信息已更新。"})
+
+
 # ============================================================
 # 路由：统计导出
 # ============================================================

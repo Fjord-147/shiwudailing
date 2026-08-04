@@ -170,11 +170,17 @@ function renderCards(items){
                 '<span class="lv-k">性别：</span><span class="lv-v">'+escapeHtml(it.claimer_gender||'未选')+'</span></div>'+
                 '<div><span class="lv-k">认领时间：</span><span class="lv-v">'+escapeHtml(it.claimed_at||'—')+'　'+
                 '<span class="lv-k">经办人：</span><span class="lv-v">'+escapeHtml(it.operator||'—')+'</span></div>'+
+                '<div class="claim-actions" style="margin-top:8px;">'+
+                    '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doUnclaim('+it.id+',\''+escapeHtml(it.code)+'\')">↩ 撤销认领</button>'+
+                    '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editClaimById('+it.id+')">✎ 修改</button>'+
+                    '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doDelete('+it.id+',\''+escapeHtml(it.code)+'\',\''+escapeHtml(it.name).replace(/'/g,"&#39;")+'\')">🗑 删除</button>'+
+                '</div>'+
                 '</div>';
         }
         // 右下角操作按钮
         var actionHtml = it.status==='待认领'
-            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
+            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a>'+
+              '<button class="btn btn-sm btn-danger-outline" style="margin-left:8px;" onclick="event.stopPropagation();doDelete('+it.id+',\''+escapeHtml(it.code)+'\',\''+escapeHtml(it.name).replace(/'/g,"&#39;")+'\')">🗑</button></div>'
             : '';
         html +=
             '<div class="lv-card" style="background:'+st.bg+';border-color:'+st.border+';">'+

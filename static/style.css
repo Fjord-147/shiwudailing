@@ -1041,6 +1041,24 @@ table.data tbody tr { cursor: pointer; }
     flex-shrink: 0;
 }
 
+/* ===== 认领管理操作按钮 ===== */
+.claim-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+/* 危险操作按钮（红色描边）*/
+.btn-danger-outline {
+    background: #fff;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+}
+.btn-danger-outline:hover {
+    background: var(--danger);
+    color: #fff;
+}
+
 /* ===== 照片放大查看器 ===== */
 .photo-zoom-overlay {
     position: fixed;

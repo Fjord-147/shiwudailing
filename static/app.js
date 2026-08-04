@@ -155,6 +155,11 @@ function showDetail(itemId) {
                       ? '<br><span class="k">认领人照片：</span><br>' +
                         '<img src="/uploads/' + it.claimer_photo + '" style="max-width:140px;max-height:140px;border-radius:6px;margin-top:4px;border:1px solid #e2e8f0;">'
                       : '') +
+                  '<div class="claim-actions">' +
+                    '<button class="btn btn-sm btn-danger-outline" onclick="doUnclaim(' + it.id + ',\'' + escapeHtml(it.code) + '\')">↩ 撤销认领</button>' +
+                    '<button class="btn btn-sm btn-secondary" onclick="doEditClaim(' + JSON.stringify(it).replace(/'/g,"&#39;") + ')">✎ 修改信息</button>' +
+                    '<button class="btn btn-sm btn-danger-outline" onclick="doDelete(' + it.id + ',\'' + escapeHtml(it.code) + '\',\'' + escapeHtml(it.name) + '\')">🗑 删除记录</button>' +
+                  '</div>' +
                   '</div>'
                 : "";
             var html =
@@ -173,7 +178,13 @@ function showDetail(itemId) {
                 '<div><span class="k">登记时间：</span><span class="v">' + (it.created_at || "—") + '</span></div>' +
                 '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">' +
                 (it.description || "—") + '</span></div>' +
-                '</div>' + claimHtml + '</div>';
+                '</div>' + claimHtml +
+                (it.status === "待认领"
+                    ? '<div class="claim-actions" style="margin-top:14px;padding-top:12px;border-top:1px dashed #ccc;">' +
+                      '<button class="btn btn-sm btn-danger-outline" onclick="doDelete(' + it.id + ',\'' + escapeHtml(it.code) + '\',\'' + escapeHtml(it.name) + '\')">🗑 删除记录</button>' +
+                      '</div>'
+                    : '') +
+                '</div>';
             openModal(html);
         });
 }
@@ -200,6 +211,106 @@ function openModal(contentHtml) {
     overlay.onclick = function () { overlay.remove(); };
     overlay.appendChild(box);
     document.body.appendChild(overlay);
+}
+
+/* ===== 危险操作确认弹窗（必须输入“确认”二字）===== */
+function confirmDanger(title, hint, onConfirm){
+    var html =
+        '<div style="text-align:center;">' +
+        '<div style="font-size:40px;margin-bottom:8px;">⚠️</div>' +
+        '<div style="font-size:18px;font-weight:600;margin-bottom:8px;">' + escapeHtml(title) + '</div>' +
+        '<div style="color:#6b7280;font-size:14px;margin-bottom:16px;">' + escapeHtml(hint) + '</div>' +
+        '<div style="background:#fff3e0;border:1px solid #ffe0b2;border-radius:6px;padding:10px;margin-bottom:14px;font-size:13px;color:#e65100;">' +
+        '请在下方输入框输入 <strong>确认</strong> 二字才会执行</div>' +
+        '<input type="text" id="dangerConfirmInput" class="form-control" placeholder="输入 确认" ' +
+        'oninput="var b=document.getElementById(\'dangerConfirmBtn\'); b.disabled = (this.value.trim()!==\'确认\');" style="text-align:center;font-size:16px;margin-bottom:16px;">' +
+        '<div style="display:flex;gap:10px;">' +
+        '<button class="btn btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>' +
+        '<button class="btn btn-danger" id="dangerConfirmBtn" style="flex:1;" disabled>确定执行</button>' +
+        '</div></div>';
+    openModal(html);
+    document.getElementById('dangerConfirmBtn').onclick = function(){
+        this.closest('.modal-overlay').remove();
+        if(onConfirm) onConfirm();
+    };
+}
+
+/* ===== 认领管理操作（撤销/删除/修改）===== */
+function doUnclaim(itemId, code){
+    confirmDanger('撤销认领', '物品 ' + code + ' 将退回「待认领」，认领人信息会被清空。', function(){
+        fetch('/api/item/'+itemId+'/unclaim', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
+            body:'confirm=' + encodeURIComponent('确认')
+        }).then(function(r){return r.json();})
+          .then(function(d){
+              toast(d.msg, d.ok ? 'success' : 'error');
+              if(d.ok){
+                  var ov = document.querySelector('.modal-overlay'); if(ov) ov.remove();
+                  setTimeout(function(){ location.reload(); }, 800);
+              }
+          });
+    });
+}
+
+function doDelete(itemId, code, name){
+    confirmDanger('删除整条记录', '将永久删除 ' + code + ' ' + name + ' 及其所有照片，无法恢复！', function(){
+        fetch('/api/item/'+itemId+'/delete', {
+            method:'POST',
+            headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
+            body:'confirm=' + encodeURIComponent('确认')
+        }).then(function(r){return r.json();})
+          .then(function(d){
+              toast(d.msg, d.ok ? 'success' : 'error');
+              if(d.ok){
+                  var ov = document.querySelector('.modal-overlay'); if(ov) ov.remove();
+                  setTimeout(function(){ location.reload(); }, 800);
+              }
+          });
+    });
+}
+
+function doEditClaim(it){
+    var html =
+        '<form onsubmit="event.preventDefault();submitEditClaim('+it.id+');">' +
+        '<div style="font-size:18px;font-weight:600;margin-bottom:16px;">修改认领信息 <span style="color:#6b7280;font-size:14px;font-weight:normal;">'+escapeHtml(it.code)+'</span></div>' +
+        '<div class="form-group" style="margin-bottom:14px;"><label>认领人姓名 <span class="req">*</span></label><input type="text" id="ec_name" class="form-control" value="'+escapeHtml(it.claimer_name||'')+'" required></div>' +
+        '<div class="form-group" style="margin-bottom:14px;"><label>认领人电话</label><input type="text" id="ec_phone" class="form-control" value="'+escapeHtml(it.claimer_phone||'')+'"></div>' +
+        '<div class="form-group" style="margin-bottom:14px;"><label>人群</label><select id="ec_group" class="form-control">'+
+            ['老人','小孩','青年','中年','其他'].map(function(g){return '<option value="'+g+'"'+(it.claimer_group===g?' selected':'')+'>'+g+'</option>';}).join('')+
+            '</select></div>' +
+        '<div class="form-group" style="margin-bottom:18px;"><label>性别</label><select id="ec_gender" class="form-control">'+
+            '<option value="">请选择</option><option value="男"'+(it.claimer_gender==='男'?' selected':'')+'>男士</option><option value="女"'+(it.claimer_gender==='女'?' selected':'')+'>女士</option>'+
+            '</select></div>' +
+        '<div style="display:flex;gap:10px;"><button type="button" class="btn btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>' +
+        '<button type="submit" class="btn" style="flex:1;">保存修改</button></div>' +
+        '</form>';
+    openModal(html);
+}
+/* 卡片用：先取详情再弹修改表单 */
+function editClaimById(itemId){
+    fetch('/api/item/'+itemId).then(function(r){return r.json();})
+        .then(function(d){ if(d.ok) doEditClaim(d.item); else toast('读取失败','error'); });
+}
+
+function submitEditClaim(itemId){
+    var fd = new URLSearchParams();
+    fd.append('claimer_name', document.getElementById('ec_name').value.trim());
+    fd.append('claimer_phone', document.getElementById('ec_phone').value.trim());
+    fd.append('claimer_group', document.getElementById('ec_group').value);
+    fd.append('claimer_gender', document.getElementById('ec_gender').value);
+    fetch('/api/item/'+itemId+'/edit-claim', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
+        body:fd.toString()
+    }).then(function(r){return r.json();})
+      .then(function(d){
+          toast(d.msg, d.ok ? 'success' : 'error');
+          if(d.ok){
+              var ov = document.querySelector('.modal-overlay'); if(ov) ov.remove();
+              setTimeout(function(){ location.reload(); }, 800);
+          }
+      });
 }
 
 /* ===== 页面卸载时关摄像头 ===== */
