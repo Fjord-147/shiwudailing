@@ -250,10 +250,6 @@ function handleCardZoom(el){
         gZoomOpen(photos, 0);
     }catch(e){ toast('打开失败','error'); }
 }
-/* 认领抽屉照片点击放大 → 统一用全局放大器 */
-function handleClaimPhotoZoom(img){
-    gZoomFromImg(img);
-}
 
 /* ===== 放大查看器：统一转发到全局 gZoomOpen（app.js）===== */
 function openPhotoZoomMulti(photos, startIdx){ gZoomOpen(photos, startIdx||0); }
@@ -272,8 +268,8 @@ function openListClaim(itemId){
             var photos = it.photo ? it.photo.split(',').filter(function(s){return s.trim();}) : [];
             var photosAttr = photos.length ? btoa(unescape(encodeURIComponent(JSON.stringify(photos)))) : '';
             var photoHtml = photos.length
-                ? '<div class="detail-photos" data-photos="'+photosAttr+'">'+photos.map(function(p,i){
-                    return '<img class="photo-big" src="/uploads/'+p.trim()+'" data-idx="'+i+'" onclick="handleClaimPhotoZoom(this)">';
+                ? '<div class="detail-photos" data-p="'+photosAttr+'">'+photos.map(function(p,i){
+                    return '<img class="photo-big" src="/uploads/'+p.trim()+'" data-idx="'+i+'" onclick="gZoomFromImg(this)" style="cursor:zoom-in;">';
                   }).join('')+'</div>'
                 : '';
             document.getElementById('listClaimDetail').innerHTML =
