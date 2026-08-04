@@ -94,7 +94,18 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
-                    <label>物品照片</label>
+                    <label>存放位置 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（物品放在哪，方便后续取）</span></label>
+                    <input type="text" name="storage_location" class="form-control" placeholder="如：导诊台2号抽屉、3号柜" list="storage_list">
+                    <datalist id="storage_list">
+                        <option value="导诊台1号抽屉">
+                        <option value="导诊台2号抽屉">
+                        <option value="导诊台3号抽屉">
+                        <option value="失物柜A">
+                        <option value="失物柜B">
+                    </datalist>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <label>物品照片 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（可传多张，一张拍不全可多拍）</span></label>
                     <div class="photo-box">
                         <div class="photo-tabs">
                             <button type="button" class="photo-tab active" data-tab="camera" data-tab-group="drphoto" onclick="switchPhotoTab(this,'drphoto')">📷 拍照</button>
@@ -103,13 +114,14 @@
                         <div id="drphoto_camera">
                             <video id="drphoto_video" autoplay playsinline></video>
                             <div style="margin-top:8px;">
-                                <button type="button" class="btn btn-sm" onclick="capturePhoto('drphoto_video','drphoto_preview','drphoto_data')">📸 抓拍</button>
+                                <button type="button" class="btn btn-sm" onclick="addCapturePhoto('drphoto_video')">📸 抓拍（可连拍多张）</button>
                             </div>
                         </div>
                         <div id="drphoto_upload" style="display:none;">
-                            <input type="file" name="photo_file" id="drphoto_file" accept="image/*" class="form-control" onchange="previewFile(this,'drphoto_preview','drphoto_data')">
+                            <input type="file" name="photo_file" id="drphoto_file" accept="image/*" multiple class="form-control" onchange="addUploadFiles(this)">
                         </div>
-                        <img id="drphoto_preview" src="" style="display:none;">
+                        <!-- 已选照片缩略图列表 -->
+                        <div class="multi-photo-list" id="drphoto_thumbs"></div>
                         <input type="hidden" name="photo_data" id="drphoto_data">
                     </div>
                 </div>
@@ -183,6 +195,58 @@
 
 {% block script %}
 <script>
+/* ===== 多照片管理（登记抽屉用）===== */
+var _regPhotos = [];  // [{type:'data', val:'data:image...'}, {type:'file', file:File}]
+function renderRegThumbs(){
+    var box = document.getElementById('drphoto_thumbs');
+    if(_regPhotos.length === 0){ box.innerHTML=''; return; }
+    var html = '';
+    _regPhotos.forEach(function(p, i){
+        html += '<div class="mp-thumb">'+
+            '<img src="'+p.preview+'">'+
+            '<button type="button" class="mp-del" onclick="event.preventDefault();removeRegPhoto('+i+')">×</button>'+
+            '</div>';
+    });
+    box.innerHTML = html;
+}
+function addCapturePhoto(videoId){
+    var video = document.getElementById(videoId);
+    if(!video || !video.videoWidth){ toast('摄像头还没准备好','warn'); return; }
+    var canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    _regPhotos.push({type:'data', val:dataUrl, preview:dataUrl});
+    renderRegThumbs();
+    toast('已抓拍第'+_regPhotos.length+'张','success');
+}
+function addUploadFiles(input){
+    var files = Array.prototype.slice.call(input.files);
+    files.forEach(function(f){
+        var reader = new FileReader();
+        reader.onload = function(e){
+            _regPhotos.push({type:'file', file:f, preview:e.target.result});
+            renderRegThumbs();
+        };
+        reader.readAsDataURL(f);
+    });
+    input.value = '';  // 清空，允许重复选同名文件
+}
+function removeRegPhoto(i){
+    _regPhotos.splice(i, 1);
+    renderRegThumbs();
+}
+// 提交前：把 _regPhotos 整理进 FormData
+function collectPhotosToForm(fd){
+    var dataParts = [];
+    _regPhotos.forEach(function(p){
+        if(p.type==='data'){ dataParts.push(p.val); }
+        else if(p.type==='file'){ fd.append('photo_file', p.file); }
+    });
+    fd.set('photo_data', dataParts.join('|||'));
+    return fd;
+}
+
 /* ===== 工作台就地搜索（不跳转）===== */
 var _dashSearchTimer = null;
 function dashSearchTimer(){
@@ -237,6 +301,9 @@ function submitRegister(e){
     e.preventDefault();  // 阻止默认整页提交
     var form = document.getElementById('regDrawerForm');
     var fd = new FormData(form);
+    // 整理多照片（拍拍的走base64，上传的走文件）
+    fd.delete('photo_file');     // 清掉空的file input
+    collectPhotosToForm(fd);
     // 用原始字段名提交，后端 register 视图照常处理；标记为AJAX返回JSON
     fetch("{{ url_for('register') }}", {
         method:'POST', body: fd,
@@ -248,8 +315,10 @@ function submitRegister(e){
                 toast(data.msg || '登记失败，请检查必填项', 'error');
                 return;
             }
-            // 成功：清空表单、关抽屉、刷新列表、弹提醒
+            // 成功：清空表单和照片、关抽屉、刷新列表、弹提醒
             form.reset();
+            _regPhotos = [];
+            renderRegThumbs();
             formDirty.register = false;
             closeDrawer('register');
             refreshPending();

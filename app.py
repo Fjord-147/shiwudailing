@@ -78,7 +78,8 @@ def init_db():
             hide_photo     INTEGER DEFAULT 0,      -- 1=敏感物品，公众界面隐藏照片
             claimer_photo  TEXT,                   -- 认领人照片（可选，老人等记不清电话时备查）
             claimer_group  TEXT,                   -- 认领人群：老人/小孩/青年/其他
-            claimer_gender TEXT                    -- 认领人性别：男/女
+            claimer_gender TEXT,                   -- 认领人性别：男/女
+            storage_location TEXT                  -- 存放位置（如导诊台2号抽屉）
         )
     """)
     # 兼容旧库：若表已存在但缺字段，自动补上
@@ -91,6 +92,8 @@ def init_db():
         conn.execute("ALTER TABLE items ADD COLUMN claimer_group TEXT")
     if "claimer_gender" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN claimer_gender TEXT")
+    if "storage_location" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN storage_location TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -474,24 +477,35 @@ def register():
         if founder == "__other__":
             founder = request.form.get("founder_other", "").strip()
 
+        storage_location = request.form.get("storage_location", "").strip()
+
         if not name:
             flash("请填写物品名称。", "error")
             return redirect(url_for("register"))
 
-        # 处理照片
-        photo_path = None
-        photo_data = request.form.get("photo_data")  # 摄像头抓拍的 base64
-        file = request.files.get("photo_file")       # 本地上传的文件
-        if photo_data and photo_data.startswith("data:image"):
-            import base64
-            header, b64 = photo_data.split(",", 1)
-            ext = "png" if "png" in header else "jpeg"
-            fname = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
-            with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
-                f.write(base64.b64decode(b64))
-            photo_path = fname
-        elif file and file.filename and allowed_photo(file.filename):
-            photo_path = save_photo(file)
+        # 处理照片（支持多张，最终存逗号分隔的文件名）
+        import base64 as _b64
+        photo_files = []  # 收集所有保存成功的文件名
+
+        # 1) 本地上传的文件（可多选）
+        for upfile in request.files.getlist("photo_file"):
+            if upfile and upfile.filename and allowed_photo(upfile.filename):
+                photo_files.append(save_photo(upfile))
+        # 2) 摄像头抓拍的 base64（前端可能传多张 photo_data，逗号分隔的多个 data:...）
+        raw_photos = request.form.get("photo_data", "")
+        if raw_photos:
+            # 按逗号拆分多个 data:image（注意 base64 内部无逗号，split(',') 会破坏，
+            # 所以前端用特殊分隔符 ||| 分隔多张）
+            for one in raw_photos.split("|||"):
+                one = one.strip()
+                if one.startswith("data:image"):
+                    header, b64 = one.split(",", 1)
+                    ext = "png" if "png" in header else "jpeg"
+                    fname = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
+                    with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
+                        f.write(_b64.b64decode(b64))
+                    photo_files.append(fname)
+        photo_path = ",".join(photo_files) if photo_files else None
 
         code = generate_code(db)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -499,11 +513,11 @@ def register():
         db.execute(
             """INSERT INTO items
                (code, name, category, description, photo, found_location,
-                found_time, founder, status, created_at, hide_photo)
-               VALUES (?,?,?,?,?,?,?,?,'待认领',?,?)""",
+                found_time, founder, status, created_at, hide_photo, storage_location)
+               VALUES (?,?,?,?,?,?,?,?,'待认领',?,?,?)""",
             (code, name, category, description, photo_path,
              found_location or None, found_time or None, founder or None,
-             now, hide_photo)
+             now, hide_photo, storage_location or None)
         )
         db.commit()
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页

@@ -142,11 +142,20 @@ function renderCards(items){
         var statusTag = it.status==='已认领'
             ? '<span class="tag tag-returned">已认领</span>'
             : '<span class="tag tag-pending">待认领</span>';
-        // 照片：有就显示并支持点击放大，没有就显示大图标
+        // 照片：解析逗号分隔的多张，渲染轮播
+        var photos = it.photo ? it.photo.split(',').filter(function(s){return s.trim();}) : [];
         var photoHtml;
-        if(it.photo){
-            photoHtml = '<div class="lv-photo-top" onclick="event.stopPropagation();openPhotoZoom(\'/uploads/'+it.photo+'\')">'+
-                        '<img src="/uploads/'+it.photo+'"><span class="lv-zoom-hint">🔍 点击放大</span></div>';
+        if(photos.length > 0){
+            var imgs = photos.map(function(p){
+                return '<div class="lv-slide"><img src="/uploads/'+p.trim()+'"></div>';
+            }).join('');
+            var arrows = photos.length > 1 ?
+                ('<button class="lv-arrow lv-arrow-l" onclick="event.stopPropagation();slideCard(this,-1)">‹</button>'+
+                 '<button class="lv-arrow lv-arrow-r" onclick="event.stopPropagation();slideCard(this,1)">›</button>'+
+                 '<div class="lv-dots">'+photos.map(function(_,i){return '<span class="lv-dot'+(i===0?' active':'')+'"></span>';}).join('')+'</div>') : '';
+            photoHtml = '<div class="lv-carousel" data-idx="0" data-count="'+photos.length+'" onclick="event.stopPropagation();openPhotoZoomMulti('+JSON.stringify(photos.map(function(p){return p.trim();}))+',0)">'+
+                '<div class="lv-track">'+imgs+'</div>'+
+                arrows+'<span class="lv-zoom-hint">🔍 点击放大</span></div>';
         } else {
             photoHtml = '<div class="lv-photo-top lv-photo-none"><span>'+st.icon+'</span></div>';
         }
@@ -179,6 +188,7 @@ function renderCards(items){
                 '<div class="lv-detail-grid">'+
                     '<div><span class="lv-k">类别：</span><span class="lv-v">'+st.icon+' '+escapeHtml(it.category||'未分类')+'</span></div>'+
                     '<div><span class="lv-k">捡到地点：</span><span class="lv-v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+                    '<div><span class="lv-k">存放位置：</span><span class="lv-v">'+escapeHtml(it.storage_location||'—')+'</span></div>'+
                     '<div><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
                     '<div><span class="lv-k">登记时间：</span><span class="lv-v">'+escapeHtml(it.created_at||'—')+'</span></div>'+
                     '<div><span class="lv-k">捡到人：</span><span class="lv-v">'+escapeHtml(it.founder||'—')+'</span></div>'+
@@ -191,10 +201,25 @@ function renderCards(items){
     grid.innerHTML = html;
 }
 
-/* ===== 照片放大查看（可缩放）===== */
-var _zoomScale = 1;
-function openPhotoZoom(src){
-    _zoomScale = 1;
+/* ===== 卡片轮播切换 ===== */
+function slideCard(btn, dir){
+    var car = btn.closest('.lv-carousel');
+    var count = parseInt(car.getAttribute('data-count'));
+    var idx = parseInt(car.getAttribute('data-idx')) + dir;
+    if(idx < 0) idx = count - 1;
+    if(idx >= count) idx = 0;
+    car.setAttribute('data-idx', idx);
+    var track = car.querySelector('.lv-track');
+    track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+    // 更新圆点
+    var dots = car.querySelectorAll('.lv-dot');
+    dots.forEach(function(d, i){ d.classList.toggle('active', i===idx); });
+}
+
+/* ===== 多图放大查看器（支持左右切换+缩放）===== */
+var _zoomIdx = 0, _zoomPhotos = [], _zoomScale = 1;
+function openPhotoZoomMulti(photos, startIdx){
+    _zoomPhotos = photos; _zoomIdx = startIdx || 0; _zoomScale = 1;
     var overlay = document.createElement('div');
     overlay.className = 'photo-zoom-overlay';
     overlay.id = 'photoZoomOverlay';
@@ -205,14 +230,49 @@ function openPhotoZoom(src){
             '<span id="zoomLabel">100%</span>'+
             '<button onclick="zoomPhoto(0.2)">➕</button>'+
             '<button onclick="zoomReset()">⟲</button>'+
+            '<span id="zoomCount"></span>'+
+            '<button onclick="zoomPrev()">‹</button>'+
+            '<button onclick="zoomNext()">›</button>'+
             '<button onclick="closePhotoZoom()" class="close-zoom">✕ 关闭</button>'+
         '</div>'+
         '<div class="photo-zoom-stage" id="zoomStage">'+
-            '<img src="'+src+'" id="zoomImg" onclick="event.stopPropagation()" '+
+            '<img id="zoomImg" onclick="event.stopPropagation()" '+
             'onwheel="event.preventDefault();zoomPhoto(event.deltaY<0?0.15:-0.15);">'+
         '</div>';
     document.body.appendChild(overlay);
+    showZoomPhoto();
 }
+function showZoomPhoto(){
+    var img = document.getElementById('zoomImg');
+    if(img) img.src = '/uploads/'+_zoomPhotos[_zoomIdx];
+    var count = document.getElementById('zoomCount');
+    if(count) count.textContent = (_zoomPhotos.length>1) ? ((_zoomIdx+1)+'/'+_zoomPhotos.length) : '';
+    _zoomScale = 1; applyZoom();
+}
+function zoomPrev(){
+    if(_zoomPhotos.length<=1) return;
+    _zoomIdx = (_zoomIdx - 1 + _zoomPhotos.length) % _zoomPhotos.length;
+    showZoomPhoto();
+}
+function zoomNext(){
+    if(_zoomPhotos.length<=1) return;
+    _zoomIdx = (_zoomIdx + 1) % _zoomPhotos.length;
+    showZoomPhoto();
+}
+/* 兼容旧的单图调用 */
+function openPhotoZoom(src){
+    openPhotoZoomMulti([src.replace('/uploads/','')], 0);
+}
+/* 键盘左右切换 + ESC */
+document.addEventListener('keydown', function(e){
+    if(document.getElementById('photoZoomOverlay')){
+        if(e.key==='Escape') closePhotoZoom();
+        else if(e.key==='ArrowLeft') zoomPrev();
+        else if(e.key==='ArrowRight') zoomNext();
+    }
+});
+
+/* 缩放函数（被上面多图查看器调用）*/
 function zoomPhoto(delta){
     _zoomScale = Math.max(0.2, Math.min(5, _zoomScale + delta));
     applyZoom();
@@ -228,9 +288,6 @@ function closePhotoZoom(){
     var o = document.getElementById('photoZoomOverlay');
     if(o) o.remove();
 }
-document.addEventListener('keydown', function(e){
-    if(e.key==='Escape') closePhotoZoom();
-});
 
 /* ===== 初始化 ===== */
 (function(){

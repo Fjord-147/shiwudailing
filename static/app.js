@@ -131,9 +131,16 @@ function showDetail(itemId) {
         .then(function (data) {
             if (!data.ok) { toast("读取失败", "error"); return; }
             var it = data.item;
-            var photoHtml = it.photo
-                ? '<img class="photo-big" src="/uploads/' + it.photo + '">'
-                : '<div style="color:#999;margin:10px 0;">（无照片）</div>';
+            // 照片：解析逗号分隔的多张，横向排列
+            var photos = it.photo ? it.photo.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+            var photoHtml;
+            if (photos.length > 0) {
+                photoHtml = '<div class="detail-photos">' + photos.map(function(p){
+                    return '<img class="photo-big" src="/uploads/' + p + '" onclick="window.open(this.src)">';
+                }).join('') + '</div>';
+            } else {
+                photoHtml = '<div style="color:#999;margin:10px 0;">（无照片）</div>';
+            }
             var claimHtml = it.status === "已认领"
                 ? '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #ccc;">' +
                   '<strong>认领信息</strong><br>' +
@@ -160,6 +167,7 @@ function showDetail(itemId) {
                 '<div class="detail-grid">' +
                 '<div><span class="k">类别：</span><span class="v">' + (it.category || "—") + '</span></div>' +
                 '<div><span class="k">捡到地点：</span><span class="v">' + (it.found_location || "—") + '</span></div>' +
+                '<div><span class="k">存放位置：</span><span class="v">' + (it.storage_location || "—") + '</span></div>' +
                 '<div><span class="k">捡到时间：</span><span class="v">' + (it.found_time || "—") + '</span></div>' +
                 '<div><span class="k">捡到人：</span><span class="v">' + (it.founder || "—") + '</span></div>' +
                 '<div><span class="k">登记时间：</span><span class="v">' + (it.created_at || "—") + '</span></div>' +

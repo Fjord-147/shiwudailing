@@ -14,6 +14,7 @@ COLUMNS = [
     ("category", "类别"),
     ("description", "特征描述"),
     ("found_location", "捡到地点"),
+    ("storage_location", "存放位置"),
     ("found_time", "捡到时间"),
     ("founder", "捡到人"),
     ("status", "状态"),
@@ -60,7 +61,7 @@ def export_items_to_excel(items):
         ws.append(line)
 
     # 列宽
-    widths = [14, 16, 12, 30, 14, 16, 10, 10, 18, 12, 14, 8, 8, 10, 18, 10, 24, 24]
+    widths = [14, 16, 12, 30, 14, 14, 16, 10, 10, 18, 12, 14, 8, 8, 10, 18, 10, 24, 24]
     for i, w in enumerate(widths, start=1):
         ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
 
