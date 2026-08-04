@@ -45,6 +45,7 @@
         <table class="data">
             <thead>
                 <tr>
+                    <th>照片</th>
                     <th>编号</th>
                     <th>名称</th>
                     <th>类别</th>
@@ -59,6 +60,15 @@
             <tbody>
                 {% for it in items %}
                 <tr>
+                    <td>
+                        {% set _photos = it.photo.split(',') if it.photo else [] %}
+                        {% if _photos %}
+                            <img class="row-thumb" src="{{ url_for('serve_upload', filename=_photos[0].strip()) }}"
+                                 onclick="openPhotoZoomMulti({{ _photos|map('trim')|list|tojson|safe }}, 0)">
+                        {% else %}
+                            <span style="color:#cbd5e1;">📦</span>
+                        {% endif %}
+                    </td>
                     <td>{{ it.code }}</td>
                     <td>{{ it.name }}</td>
                     <td>{{ it.category or '—' }}</td>
@@ -75,7 +85,7 @@
                     <td>{{ it.claimed_at or '—' }}</td>
                     <td onclick="event.stopPropagation()">
                         {% if it.status == '待认领' %}
-                            <a href="{{ url_for('index', claim=it.code) }}" class="btn btn-success btn-sm">认领</a>
+                            <button class="btn btn-success btn-sm" onclick="openListClaim({{ it.id }})">认领</button>
                         {% else %}
                             <span style="color:#9ca3af;font-size:13px;">已认领</span>
                         {% endif %}
@@ -93,6 +103,20 @@
     <div id="cardView" style="display:none;">
         <div class="lv-grid" id="cardGrid"></div>
         <div class="empty" id="cardEmpty" style="display:none;">没有符合条件的记录</div>
+    </div>
+</div>
+
+<!-- 认领抽屉（就地认领，不跳工作台）-->
+<div class="drawer-overlay" id="listClaimDrawer" onclick="if(event.target===this) closeListClaim()">
+    <div class="drawer" onclick="event.stopPropagation()">
+        <div class="drawer-head">
+            <h2>🔍 认领登记</h2>
+            <button class="drawer-close" onclick="closeListClaim()">×</button>
+        </div>
+        <div class="drawer-body">
+            <div id="listClaimDetail"></div>
+            <div id="listClaimForm"></div>
+        </div>
     </div>
 </div>
 
@@ -174,7 +198,7 @@ function renderCards(items){
         }
         // 右下角操作按钮：待认领保留认领入口，不含删除（管理操作去认领管理页）
         var actionHtml = it.status==='待认领'
-            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
+            ? '<div class="lv-action"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();openListClaim('+it.id+')">✓ 认领</button></div>'
             : '';
         html +=
             '<div class="lv-card" style="background:'+st.bg+';border-color:'+st.border+';">'+
@@ -287,6 +311,71 @@ function applyZoom(){
 function closePhotoZoom(){
     var o = document.getElementById('photoZoomOverlay');
     if(o) o.remove();
+}
+
+/* ===== 认领抽屉（就地认领）===== */
+var _listClaimPhoneConfirmed = false;
+function openListClaim(itemId){
+    fetch('/api/item/'+itemId).then(function(r){return r.json();})
+        .then(function(d){
+            if(!d.ok){ toast('读取失败','error'); return; }
+            var it = d.item;
+            _listClaimPhoneConfirmed = false;
+            // 详情区
+            var photos = it.photo ? it.photo.split(',').filter(function(s){return s.trim();}) : [];
+            var photoHtml = photos.length
+                ? '<div class="detail-photos">'+photos.map(function(p,i){return '<img class="photo-big" src="/uploads/'+p.trim()+'" onclick="window.open(this.src)">';}).join('')+'</div>'
+                : '';
+            document.getElementById('listClaimDetail').innerHTML =
+                '<div class="detail-panel" style="margin:0 0 16px;">'+
+                '<div><span class="code">编号 '+escapeHtml(it.code)+'</span> <span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>'+
+                '<div style="font-size:18px;font-weight:600;margin:6px 0;">'+escapeHtml(it.name)+'</div>'+
+                photoHtml+
+                '<div class="detail-grid">'+
+                '<div><span class="k">类别：</span><span class="v">'+escapeHtml(it.category||'—')+'</span></div>'+
+                '<div><span class="k">捡到地点：</span><span class="v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+                '<div style="grid-column:1/-1;"><span class="k">特征（请核对）：</span><br><span class="v" style="color:#c62828;font-weight:600;">'+escapeHtml(it.description||'—')+'</span></div>'+
+                '</div></div>';
+            // 表单区
+            document.getElementById('listClaimForm').innerHTML =
+                '<form id="listClaimFormEl" onsubmit="event.preventDefault();submitListClaim('+it.id+')">'+
+                '<input type="hidden" name="item_id" value="'+it.id+'">'+
+                '<div class="form-row2">'+
+                '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
+                '<div class="form-group"><label>认领人电话</label><input type="text" name="claimer_phone" class="form-control" placeholder="选填"></div>'+
+                '</div>'+
+                '<div class="form-row2">'+
+                '<div class="form-group"><label>人群</label><select name="claimer_group" class="form-control"><option value="">请选择</option><option>老人</option><option>小孩</option><option>青年</option><option>中年</option><option>其他</option></select></div>'+
+                '<div class="form-group"><label>性别</label><select name="claimer_gender" class="form-control"><option value="">请选择</option><option value="男">男士</option><option value="女">女士</option></select></div>'+
+                '</div>'+
+                '<input type="hidden" name="operator" value="{{ current_user }}">'+
+                '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" name="feature_verified" value="1"><span>我已核对物品特征无误</span></label>'+
+                '<button type="submit" class="btn btn-success btn-block">✓ 确认认领</button>'+
+                '<div style="font-size:12px;color:#6b7280;margin-top:8px;text-align:center;">不传照片也能正常认领</div>'+
+                '</form>';
+            document.getElementById('listClaimDrawer').classList.add('open');
+        });
+}
+function closeListClaim(){
+    document.getElementById('listClaimDrawer').classList.remove('open');
+}
+function submitListClaim(itemId){
+    var form = document.getElementById('listClaimFormEl');
+    var phone = form.querySelector('[name="claimer_phone"]').value.trim();
+    if(!phone && !_listClaimPhoneConfirmed){
+        if(!confirm('未填写联系电话，后续可能无法联系认领人。确定要不填电话继续吗？')) return;
+        _listClaimPhoneConfirmed = true;
+    }
+    var fd = new FormData(form);
+    fetch('/claim', {method:'POST', body: fd, headers:{'X-Requested-With':'fetch'}})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if(!d.ok){ toast(d.msg||'认领失败','error'); return; }
+            _listClaimPhoneConfirmed = false;
+            closeListClaim();
+            toast(d.msg, 'success');
+            setTimeout(function(){ location.reload(); }, 800);
+        });
 }
 
 /* ===== 初始化 ===== */
