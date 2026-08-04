@@ -114,12 +114,38 @@ a:hover { text-decoration: underline; }
     color: #fff;
 }
 .sidebar-nav a.active {
-    background: rgba(255,255,255,.18);
-    border-left-color: #fff;
+    background: rgba(255,255,255,.28);
+    border-left: 4px solid #ffd54f;   /* 金色高亮条，更醒目 */
     color: #fff;
     font-weight: 600;
 }
 .sidebar-nav .nav-icon { font-size: 18px; flex-shrink: 0; }
+
+/* 内容区顶部返回栏 */
+.back-bar {
+    padding: 10px 24px;
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+.back-btn {
+    background: #fff;
+    border: 1px solid var(--border);
+    color: var(--primary);
+    padding: 6px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all .15s;
+}
+.back-btn:hover {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
 .sidebar-footer {
     padding: 14px 18px;
     border-top: 1px solid rgba(255,255,255,.15);
@@ -561,7 +587,7 @@ table.data tbody tr { cursor: pointer; }
     .sidebar-brand span { display: none; }
     .sidebar-nav a { justify-content: center; padding: 14px 0; }
     .sidebar-nav a span:last-child { display: none; }
-    .sidebar-nav a.active { border-left-color: transparent; border-right: 3px solid #fff; }
+    .sidebar-nav a.active { border-left: none; border-bottom: 3px solid #ffd54f; }
     .sidebar-footer .user-info { display: none; }
     .sidebar-footer { padding: 12px 0; text-align: center; }
     .sidebar-footer .user-action { margin: 0 6px; }
@@ -573,6 +599,19 @@ table.data tbody tr { cursor: pointer; }
 
 /* 公众导航：稍微区分一下 */
 .public-nav { background: linear-gradient(135deg, #2E7D9B 0%, #1f5d75 100%); }
+.public-back {
+    background: rgba(255,255,255,.2);
+    color: #fff;
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    margin-right: 8px;
+    padding: 0;
+}
+.public-back:hover { background: rgba(255,255,255,.35); }
 .public-nav .admin-entry {
     color: #fff;
     font-size: 13px;

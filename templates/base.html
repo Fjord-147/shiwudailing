@@ -13,16 +13,16 @@
         <aside class="sidebar">
             <div class="sidebar-brand">🏥<br><span>失物招领</span></div>
             <nav class="sidebar-nav">
-                <a href="{{ url_for('index') }}" class="{% if active == 'index' %}active{% endif %}">
+                <a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}">
                     <span class="nav-icon">🏠</span><span>工作台</span>
                 </a>
-                <a href="{{ url_for('item_list') }}" class="{% if active == 'list' %}active{% endif %}">
+                <a href="{{ url_for('item_list') }}" class="{% if request.endpoint == 'item_list' %}active{% endif %}">
                     <span class="nav-icon">📋</span><span>失物总表</span>
                 </a>
-                <a href="{{ url_for('reports') }}" class="{% if active == 'reports' %}active{% endif %}">
+                <a href="{{ url_for('reports') }}" class="{% if request.endpoint == 'reports' %}active{% endif %}">
                     <span class="nav-icon">📬</span><span>报失处理</span>
                 </a>
-                <a href="{{ url_for('stats') }}" class="{% if active == 'stats' %}active{% endif %}">
+                <a href="{{ url_for('stats') }}" class="{% if request.endpoint == 'stats' %}active{% endif %}">
                     <span class="nav-icon">📊</span><span>统计导出</span>
                 </a>
             </nav>
@@ -38,6 +38,9 @@
 
         <!-- 右侧内容区 -->
         <main class="content-area">
+            <div class="back-bar">
+                <button class="back-btn" onclick="history.back()" title="返回上一页">← 返回</button>
+            </div>
             <div class="container">
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% for cat, msg in messages %}
