@@ -102,16 +102,16 @@
 
 {% block script %}
 <script>
-/* ===== 类别 → 图标 + 边框颜色 映射 ===== */
+/* ===== 类别 → 图标 + 浅背景色 映射（整个卡片背景用浅色）===== */
 var CATEGORY_STYLE = {
-    "证件":        {icon: "🪪", color: "#c62828"},
-    "钱包":        {icon: "👛", color: "#c62828"},
-    "手机/电子产品":{icon: "📱", color: "#1f2937"},
-    "钥匙":        {icon: "🔑", color: "#1f2937"},
-    "病历/检查单":  {icon: "📄", color: "#555555"},
-    "衣物":        {icon: "👕", color: "#1565c0"},
-    "水杯/雨伞":   {icon: "☂️", color: "#2e7d32"},
-    "其他":        {icon: "📦", color: "#6b7280"}
+    "证件":        {icon: "🪪", bg: "#fdedee", border: "#f5c2c7"},  // 浅红
+    "钱包":        {icon: "👛", bg: "#fdedee", border: "#f5c2c7"},  // 浅红
+    "手机/电子产品":{icon: "📱", bg: "#ecedf0", border: "#cfd2d8"},  // 浅灰黑
+    "钥匙":        {icon: "🔑", bg: "#ecedf0", border: "#cfd2d8"},  // 浅灰黑
+    "病历/检查单":  {icon: "📄", bg: "#f6f6f4", border: "#e0e0dc"},  // 浅米白
+    "衣物":        {icon: "👕", bg: "#e7f0fe", border: "#c2dbf7"},  // 浅蓝
+    "水杯/雨伞":   {icon: "☂️", bg: "#e9f5ea", border: "#c6e3c9"},  // 浅绿
+    "其他":        {icon: "📦", bg: "#f3f4f6", border: "#d9dde3"}   // 浅灰
 };
 function getCatStyle(cat){
     return CATEGORY_STYLE[cat] || CATEGORY_STYLE["其他"];
@@ -168,10 +168,10 @@ function renderCards(items){
             ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
             : '';
         html +=
-            '<div class="lv-card" style="border-color:'+st.color+';">'+
+            '<div class="lv-card" style="background:'+st.bg+';border-color:'+st.border+';">'+
                 '<div class="lv-card-head">'+
                     '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
-                    '<span class="lv-cat-icon" style="color:'+st.color+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
+                    '<span class="lv-cat-icon" style="color:'+st.border+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
                     statusTag+
                 '</div>'+
                 '<div class="lv-card-title">'+escapeHtml(it.name)+'</div>'+

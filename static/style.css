@@ -784,67 +784,69 @@ table.data tbody tr { cursor: pointer; }
 }
 .view-btn:hover:not(.active) { background: var(--primary-light); }
 
-/* 卡片网格：每行自适应 */
+/* 卡片网格：固定卡片宽度，整齐排列 */
 .lv-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    grid-template-columns: repeat(auto-fill, 320px);
     gap: 16px;
+    justify-content: start;
 }
-/* 单张卡片：详情样式（照片顶 + 网格信息下）*/
+/* 单张卡片：固定宽度 + 整体浅色背景（颜色由JS按类别传入）*/
 .lv-card {
     border: 1px solid;
-    border-left-width: 5px;
     border-radius: 10px;
-    background: var(--primary-light);
-    padding: 16px 20px;
-    transition: box-shadow .15s;
+    padding: 14px 16px;
+    width: 320px;
+    transition: box-shadow .15s, transform .15s;
 }
-.lv-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+.lv-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    transform: translateY(-2px);
+}
 /* 头部：编号 + 图标 + 状态 */
 .lv-card-head {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 .lv-code { color: #666; font-size: 13px; }
-.lv-cat-icon { font-size: 22px; line-height: 1; margin-left: 4px; }
+.lv-cat-icon { font-size: 20px; line-height: 1; }
 /* 标题：物品名称 */
 .lv-card-title {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 600;
     margin: 6px 0 4px;
     color: #1f2937;
 }
-/* 顶部照片区（可点击放大）*/
+/* 顶部照片区（可点击放大，固定高度）*/
 .lv-photo-top {
     position: relative;
     margin: 8px 0;
     cursor: zoom-in;
-    display: inline-block;
+    width: 100%;
+    height: 180px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(255,255,255,.5);
 }
 .lv-photo-top img {
-    max-width: 100%;
-    max-height: 220px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
 }
 .lv-photo-top.lv-photo-none {
-    width: 100%;
-    height: 120px;
-    background: rgba(255,255,255,.5);
-    border-radius: 8px;
     border: 1px dashed var(--border);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: default;
 }
-.lv-photo-top.lv-photo-none span { font-size: 56px; opacity: .35; }
+.lv-photo-top.lv-photo-none span { font-size: 52px; opacity: .35; }
 .lv-zoom-hint {
     position: absolute;
-    bottom: 8px;
+    bottom: 6px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(0,0,0,.6);
@@ -854,30 +856,32 @@ table.data tbody tr { cursor: pointer; }
     border-radius: 10px;
     white-space: nowrap;
 }
-/* 信息网格（左灰键 右黑值，跟详情弹窗一致）*/
+/* 信息网格（左灰键 右黑值）——白色底，在浅色卡片上更清晰 */
 .lv-detail-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px 24px;
-    margin-top: 10px;
-    padding: 12px 14px;
+    gap: 6px 16px;
+    margin-top: 8px;
+    padding: 10px 12px;
     background: #fff;
     border-radius: 6px;
+    font-size: 13px;
 }
-.lv-k { color: #6b7280; font-size: 13px; }
-.lv-v { color: #1f2937; font-size: 15px; word-break: break-all; }
+.lv-k { color: #6b7280; }
+.lv-v { color: #1f2937; word-break: break-all; }
 /* 认领信息块 */
 .lv-claim-box {
-    margin-top: 10px;
-    padding: 10px 14px;
-    border-top: 1px dashed #b3d4e0;
-    font-size: 14px;
-    line-height: 1.9;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,.7);
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.8;
 }
 .lv-claim-box strong { color: #1f5d75; }
 /* 卡片右下角认领按钮 */
 .lv-action {
-    margin-top: 10px;
+    margin-top: 8px;
     text-align: right;
 }
 
@@ -940,8 +944,7 @@ table.data tbody tr { cursor: pointer; }
 @media (max-width: 768px) {
     .view-btn .view-label { display: none; }
     .lv-grid { grid-template-columns: 1fr; }
-    .lv-card-main { flex-direction: column; }
-    .lv-photo { width: 100%; height: 180px; }
+    .lv-card { width: 100%; }
 }
 
 
