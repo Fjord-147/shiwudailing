@@ -126,7 +126,7 @@ function switchView(view){
     localStorage.setItem('lf_list_view', view);
 }
 
-/* ===== 渲染卡片（信息直接平铺，不用点开）===== */
+/* ===== 渲染卡片（采用详情弹窗样式：照片顶部 + 网格信息）===== */
 function renderCards(items){
     var grid = document.getElementById('cardGrid');
     var emptyBox = document.getElementById('cardEmpty');
@@ -142,49 +142,49 @@ function renderCards(items){
         var statusTag = it.status==='已认领'
             ? '<span class="tag tag-returned">已认领</span>'
             : '<span class="tag tag-pending">待认领</span>';
-        // 右下角操作按钮：待认领才显示认领入口
-        var actionHtml = it.status==='待认领'
-            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
-            : '';
         // 照片：有就显示并支持点击放大，没有就显示大图标
-        var photoBlock;
+        var photoHtml;
         if(it.photo){
-            photoBlock = '<div class="lv-photo" onclick="event.stopPropagation();openPhotoZoom(\'/uploads/'+it.photo+'\')">'+
-                         '<img src="/uploads/'+it.photo+'">'+
-                         '<span class="lv-zoom-hint">🔍 点击放大</span></div>';
+            photoHtml = '<div class="lv-photo-top" onclick="event.stopPropagation();openPhotoZoom(\'/uploads/'+it.photo+'\')">'+
+                        '<img src="/uploads/'+it.photo+'"><span class="lv-zoom-hint">🔍 点击放大</span></div>';
         } else {
-            photoBlock = '<div class="lv-photo lv-photo-none"><span>'+st.icon+'</span></div>';
+            photoHtml = '<div class="lv-photo-top lv-photo-none"><span>'+st.icon+'</span></div>';
         }
         // 认领信息（已认领才显示）
         var claimInfo = '';
         if(it.status==='已认领'){
-            claimInfo = '<div class="lv-row"><span class="lv-k">认领人：</span><span class="lv-v">'+
-                escapeHtml(it.claimer_name||'—')+'</span></div>'+
-                '<div class="lv-row"><span class="lv-k">认领时间：</span><span class="lv-v">'+
-                escapeHtml(it.claimed_at||'—')+'</span></div>';
+            claimInfo = '<div class="lv-claim-box">'+
+                '<strong>认领信息</strong>'+
+                '<div><span class="lv-k">认领人：</span><span class="lv-v">'+escapeHtml(it.claimer_name||'—')+'　'+
+                '<span class="lv-k">电话：</span><span class="lv-v">'+escapeHtml(it.claimer_phone||'未留')+'</span></div>'+
+                '<div><span class="lv-k">人群：</span><span class="lv-v">'+escapeHtml(it.claimer_group||'未选')+'　'+
+                '<span class="lv-k">性别：</span><span class="lv-v">'+escapeHtml(it.claimer_gender||'未选')+'</span></div>'+
+                '<div><span class="lv-k">认领时间：</span><span class="lv-v">'+escapeHtml(it.claimed_at||'—')+'　'+
+                '<span class="lv-k">经办人：</span><span class="lv-v">'+escapeHtml(it.operator||'—')+'</span></div>'+
+                '</div>';
         }
+        // 右下角操作按钮
+        var actionHtml = it.status==='待认领'
+            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
+            : '';
         html +=
             '<div class="lv-card" style="border-color:'+st.color+';">'+
-                '<div class="lv-card-main">'+
-                    photoBlock+
-                    '<div class="lv-info">'+
-                        '<div class="lv-line1">'+
-                            '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
-                            '<span class="lv-cat-icon" style="color:'+st.color+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
-                            statusTag+
-                        '</div>'+
-                        '<div class="lv-name-row">'+
-                            '<span class="lv-cat-label">类别：</span>'+
-                            '<span class="lv-cat-val">'+st.icon+' '+escapeHtml(it.category||'未分类')+'</span>'+
-                        '</div>'+
-                        '<div class="lv-row"><span class="lv-k">捡到地点：</span><span class="lv-v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
-                        '<div class="lv-row"><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
-                        '<div class="lv-row"><span class="lv-k">登记时间：</span><span class="lv-v">'+escapeHtml(it.created_at||'—')+'</span></div>'+
-                        '<div class="lv-row"><span class="lv-k">捡到人：</span><span class="lv-v">'+escapeHtml(it.founder||'—')+'</span></div>'+
-                        '<div class="lv-feature"><span class="lv-k">特征：</span>'+escapeHtml(it.description||'—')+'</div>'+
-                        claimInfo+
-                    '</div>'+
+                '<div class="lv-card-head">'+
+                    '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
+                    '<span class="lv-cat-icon" style="color:'+st.color+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
+                    statusTag+
                 '</div>'+
+                '<div class="lv-card-title">'+escapeHtml(it.name)+'</div>'+
+                photoHtml+
+                '<div class="lv-detail-grid">'+
+                    '<div><span class="lv-k">类别：</span><span class="lv-v">'+st.icon+' '+escapeHtml(it.category||'未分类')+'</span></div>'+
+                    '<div><span class="lv-k">捡到地点：</span><span class="lv-v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
+                    '<div><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
+                    '<div><span class="lv-k">登记时间：</span><span class="lv-v">'+escapeHtml(it.created_at||'—')+'</span></div>'+
+                    '<div><span class="lv-k">捡到人：</span><span class="lv-v">'+escapeHtml(it.founder||'—')+'</span></div>'+
+                    '<div style="grid-column:1/-1;"><span class="lv-k">特征描述：</span><br><span class="lv-v">'+escapeHtml(it.description||'—')+'</span></div>'+
+                '</div>'+
+                claimInfo+
                 actionHtml+
             '</div>';
     });
