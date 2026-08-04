@@ -395,9 +395,16 @@ function viewItemDetail(id){
         .then(function(data){
             if(!data.ok){ toast('读取失败','error'); return; }
             var it = data.item;
-            var photoHtml = it.photo
-                ? '<img class="photo-big" src="/uploads/'+it.photo+'">'
-                : '<div style="color:#999;margin:10px 0;">（无照片）</div>';
+            var photos = it.photo ? it.photo.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+            var photoHtml;
+            if(photos.length){
+                var pAttr = btoa(unescape(encodeURIComponent(JSON.stringify(photos))));
+                photoHtml = '<div class="detail-photos" data-p="'+pAttr+'">'+photos.map(function(p,i){
+                    return '<img class="photo-big" src="/uploads/'+p+'" data-idx="'+i+'" onclick="gZoomFromImg(this)">';
+                }).join('')+'</div>';
+            } else {
+                photoHtml = '<div style="color:#999;margin:10px 0;">（无照片）</div>';
+            }
             var html =
                 '<div class="detail-panel" style="margin:0;">'+
                 '<div><span class="code">编号 '+it.code+'</span>'+
@@ -509,7 +516,14 @@ function fillClaimForm(it){
         '<div class="detail-panel" style="margin-bottom:16px;">'+
         '<div><span class="code">编号 '+it.code+'</span> <span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>'+
         '<div style="font-size:18px;font-weight:600;margin:6px 0;">'+escapeHtml(it.name)+'</div>'+
-        (it.photo?'<img class="photo-big" src="/uploads/'+it.photo+'">':'')+
+        (function(){
+            var ps = it.photo ? it.photo.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+            if(!ps.length) return '';
+            var a = btoa(unescape(encodeURIComponent(JSON.stringify(ps))));
+            return '<div class="detail-photos" data-p="'+a+'">'+ps.map(function(p,i){
+                return '<img class="photo-big" src="/uploads/'+p+'" data-idx="'+i+'" onclick="gZoomFromImg(this)">';
+            }).join('')+'</div>';
+        })()+
         '<div class="detail-grid">'+
         '<div><span class="k">类别：</span><span class="v">'+escapeHtml(it.category||'—')+'</span></div>'+
         '<div><span class="k">地点：</span><span class="v">'+escapeHtml(it.found_location||'—')+'</span></div>'+

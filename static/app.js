@@ -1,5 +1,89 @@
 /* 门诊失物招领系统 - 公共脚本 */
 
+/* ===== 全局照片放大查看器（所有页面共享，支持多图+缩放+关闭）===== */
+var GZOOM = {idx:0, photos:[], scale:1};
+function gZoomOpen(photos, startIdx){
+    if(!photos || photos.length===0) return;
+    gZoomClose();
+    GZOOM.photos = photos; GZOOM.idx = startIdx || 0; GZOOM.scale = 1;
+    var overlay = document.createElement('div');
+    overlay.className = 'photo-zoom-overlay';
+    overlay.id = 'gZoomOverlay';
+    overlay.innerHTML =
+        '<div class="photo-zoom-bar">'+
+            '<button data-act="out" title="缩小">➖</button>'+
+            '<span id="gZoomLabel">100%</span>'+
+            '<button data-act="in" title="放大">➕</button>'+
+            '<button data-act="reset" title="还原">⟲</button>'+
+            '<span id="gZoomCount"></span>'+
+            '<button data-act="prev" title="上一张">‹</button>'+
+            '<button data-act="next" title="下一张">›</button>'+
+            '<button data-act="close" class="close-zoom" title="关闭">✕ 关闭</button>'+
+        '</div>'+
+        '<div class="photo-zoom-stage"><img id="gZoomImg"></div>';
+    document.body.appendChild(overlay);
+    overlay.querySelector('.photo-zoom-bar').addEventListener('click', function(e){
+        var btn = e.target.closest('button'); if(!btn) return;
+        var act = btn.getAttribute('data-act');
+        if(act==='out') gZoomScale(-0.2);
+        else if(act==='in') gZoomScale(0.2);
+        else if(act==='reset'){ GZOOM.scale=1; gZoomApply(); }
+        else if(act==='prev') gZoomStep(-1);
+        else if(act==='next') gZoomStep(1);
+        else if(act==='close') gZoomClose();
+    });
+    overlay.addEventListener('click', function(e){ if(e.target===overlay) gZoomClose(); });
+    document.getElementById('gZoomImg').addEventListener('wheel', function(e){
+        e.preventDefault(); gZoomScale(e.deltaY<0 ? 0.15 : -0.15);
+    });
+    gZoomShow();
+}
+function gZoomShow(){
+    var img = document.getElementById('gZoomImg');
+    if(img) img.src = '/uploads/'+GZOOM.photos[GZOOM.idx];
+    var c = document.getElementById('gZoomCount');
+    if(c) c.textContent = GZOOM.photos.length>1 ? ((GZOOM.idx+1)+'/'+GZOOM.photos.length) : '';
+    GZOOM.scale = 1; gZoomApply();
+}
+function gZoomStep(dir){
+    if(GZOOM.photos.length<=1) return;
+    GZOOM.idx = (GZOOM.idx + dir + GZOOM.photos.length) % GZOOM.photos.length;
+    gZoomShow();
+}
+function gZoomScale(delta){
+    GZOOM.scale = Math.max(0.2, Math.min(5, GZOOM.scale + delta));
+    gZoomApply();
+}
+function gZoomApply(){
+    var img = document.getElementById('gZoomImg');
+    if(img) img.style.transform = 'scale('+GZOOM.scale+')';
+    var lb = document.getElementById('gZoomLabel');
+    if(lb) lb.textContent = Math.round(GZOOM.scale*100)+'%';
+}
+function gZoomClose(){
+    var o = document.getElementById('gZoomOverlay'); if(o) o.remove();
+}
+document.addEventListener('keydown', function(e){
+    if(document.getElementById('gZoomOverlay')){
+        if(e.key==='Escape') gZoomClose();
+        else if(e.key==='ArrowLeft') gZoomStep(-1);
+        else if(e.key==='ArrowRight') gZoomStep(1);
+    }
+});
+/* 便捷封装：传入逗号分隔的photo字段，点击放大 */
+function gZoomFromField(photoField, idx){
+    var photos = (photoField||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+    gZoomOpen(photos, idx||0);
+}
+/* 从图片元素点击放大：照片列表存在父容器的 data-p（base64），点的是第 data-idx 张 */
+function gZoomFromImg(img){
+    try{
+        var box = img.closest('[data-p]');
+        var photos = JSON.parse(decodeURIComponent(escape(atob(box.getAttribute('data-p')))));
+        gZoomOpen(photos, parseInt(img.getAttribute('data-idx'))||0);
+    }catch(e){}
+}
+
 /* ===== HTML 转义（防注入，所有页面通用）===== */
 function escapeHtml(s){
     if(s==null) return '';
@@ -135,8 +219,9 @@ function showDetail(itemId) {
             var photos = it.photo ? it.photo.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
             var photoHtml;
             if (photos.length > 0) {
-                photoHtml = '<div class="detail-photos">' + photos.map(function(p){
-                    return '<img class="photo-big" src="/uploads/' + p + '" onclick="window.open(this.src)">';
+                var pAttr = btoa(unescape(encodeURIComponent(JSON.stringify(photos))));
+                photoHtml = '<div class="detail-photos" data-p="' + pAttr + '">' + photos.map(function(p, i){
+                    return '<img class="photo-big" src="/uploads/' + p + '" data-idx="' + i + '" onclick="gZoomFromImg(this)">';
                 }).join('') + '</div>';
             } else {
                 photoHtml = '<div style="color:#999;margin:10px 0;">（无照片）</div>';
@@ -153,7 +238,7 @@ function showDetail(itemId) {
                   '特征已核实：' + (it.feature_verified ? "是" : "否") +
                   (it.claimer_photo
                       ? '<br><span class="k">认领人照片：</span><br>' +
-                        '<img src="/uploads/' + it.claimer_photo + '" style="max-width:140px;max-height:140px;border-radius:6px;margin-top:4px;border:1px solid #e2e8f0;">'
+                        '<img src="/uploads/' + it.claimer_photo + '" style="max-width:140px;max-height:140px;border-radius:6px;margin-top:4px;border:1px solid #e2e8f0;cursor:zoom-in;" onclick="gZoomOpen([\'' + it.claimer_photo + '\'],0)">'
                       : '') +
                   '<div class="claim-actions">' +
                     '<button class="btn btn-sm btn-danger-outline" onclick="doUnclaim(' + it.id + ',\'' + escapeHtml(it.code) + '\')">↩ 撤销认领</button>' +

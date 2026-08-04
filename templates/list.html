@@ -64,7 +64,8 @@
                         {% set _photos = it.photo.split(',') if it.photo else [] %}
                         {% if _photos %}
                             <img class="row-thumb" src="{{ url_for('serve_upload', filename=_photos[0].strip()) }}"
-                                 onclick="openPhotoZoomMulti({{ _photos|map('trim')|list|tojson|safe }}, 0)">
+                                 data-photo="{{ it.photo or '' }}"
+                                 onclick="gZoomFromField(this.getAttribute('data-photo'),0)">
                         {% else %}
                             <span style="color:#cbd5e1;">📦</span>
                         {% endif %}
@@ -242,105 +243,22 @@ function slideCard(btn, dir){
     dots.forEach(function(d, i){ d.classList.toggle('active', i===idx); });
 }
 
-/* 卡片照片点击放大（从 data-photos 解码，避免引号截断）*/
+/* 卡片照片点击放大 → 统一用全局放大器 gZoomFromImg */
 function handleCardZoom(el){
     try{
         var photos = JSON.parse(decodeURIComponent(escape(atob(el.getAttribute('data-photos')))));
-        openPhotoZoomMulti(photos, 0);
+        gZoomOpen(photos, 0);
     }catch(e){ toast('打开失败','error'); }
 }
+/* 认领抽屉照片点击放大 → 统一用全局放大器 */
+function handleClaimPhotoZoom(img){
+    gZoomFromImg(img);
+}
 
-/* ===== 多图放大查看器（支持左右切换+缩放）===== */
-var _zoomIdx = 0, _zoomPhotos = [], _zoomScale = 1;
-function openPhotoZoomMulti(photos, startIdx){
-    if(!photos || photos.length===0) return;
-    // 先关掉已存在的
-    closePhotoZoom();
-    _zoomPhotos = photos; _zoomIdx = startIdx || 0; _zoomScale = 1;
-    var overlay = document.createElement('div');
-    overlay.className = 'photo-zoom-overlay';
-    overlay.id = 'photoZoomOverlay';
-    overlay.innerHTML =
-        '<div class="photo-zoom-bar">'+
-            '<button data-act="out" title="缩小">➖</button>'+
-            '<span id="zoomLabel">100%</span>'+
-            '<button data-act="in" title="放大">➕</button>'+
-            '<button data-act="reset" title="还原">⟲</button>'+
-            '<span id="zoomCount"></span>'+
-            '<button data-act="prev" title="上一张">‹</button>'+
-            '<button data-act="next" title="下一张">›</button>'+
-            '<button data-act="close" class="close-zoom" title="关闭">✕ 关闭</button>'+
-        '</div>'+
-        '<div class="photo-zoom-stage" id="zoomStage">'+
-            '<img id="zoomImg">'+
-        '</div>';
-    document.body.appendChild(overlay);
-    // 事件绑定（不用内联onclick，避免作用域问题）
-    overlay.querySelector('.photo-zoom-bar').addEventListener('click', function(e){
-        var btn = e.target.closest('button');
-        if(!btn) return;
-        var act = btn.getAttribute('data-act');
-        if(act==='out') zoomPhoto(-0.2);
-        else if(act==='in') zoomPhoto(0.2);
-        else if(act==='reset') zoomReset();
-        else if(act==='prev') zoomPrev();
-        else if(act==='next') zoomNext();
-        else if(act==='close') closePhotoZoom();
-    });
-    overlay.addEventListener('click', function(e){ if(e.target===overlay) closePhotoZoom(); });
-    // 滚轮缩放
-    document.getElementById('zoomImg').addEventListener('wheel', function(e){
-        e.preventDefault();
-        zoomPhoto(e.deltaY<0 ? 0.15 : -0.15);
-    });
-    showZoomPhoto();
-}
-function showZoomPhoto(){
-    var img = document.getElementById('zoomImg');
-    if(img) img.src = '/uploads/'+_zoomPhotos[_zoomIdx];
-    var count = document.getElementById('zoomCount');
-    if(count) count.textContent = (_zoomPhotos.length>1) ? ((_zoomIdx+1)+'/'+_zoomPhotos.length) : '';
-    _zoomScale = 1; applyZoom();
-}
-function zoomPrev(){
-    if(_zoomPhotos.length<=1) return;
-    _zoomIdx = (_zoomIdx - 1 + _zoomPhotos.length) % _zoomPhotos.length;
-    showZoomPhoto();
-}
-function zoomNext(){
-    if(_zoomPhotos.length<=1) return;
-    _zoomIdx = (_zoomIdx + 1) % _zoomPhotos.length;
-    showZoomPhoto();
-}
-/* 兼容旧的单图调用 */
-function openPhotoZoom(src){
-    openPhotoZoomMulti([src.replace('/uploads/','')], 0);
-}
-/* 键盘左右切换 + ESC */
-document.addEventListener('keydown', function(e){
-    if(document.getElementById('photoZoomOverlay')){
-        if(e.key==='Escape') closePhotoZoom();
-        else if(e.key==='ArrowLeft') zoomPrev();
-        else if(e.key==='ArrowRight') zoomNext();
-    }
-});
-
-/* 缩放函数（被上面多图查看器调用）*/
-function zoomPhoto(delta){
-    _zoomScale = Math.max(0.2, Math.min(5, _zoomScale + delta));
-    applyZoom();
-}
-function zoomReset(){ _zoomScale = 1; applyZoom(); }
-function applyZoom(){
-    var img = document.getElementById('zoomImg');
-    if(img){ img.style.transform = 'scale('+_zoomScale+')'; }
-    var label = document.getElementById('zoomLabel');
-    if(label){ label.textContent = Math.round(_zoomScale*100)+'%'; }
-}
-function closePhotoZoom(){
-    var o = document.getElementById('photoZoomOverlay');
-    if(o) o.remove();
-}
+/* ===== 放大查看器：统一转发到全局 gZoomOpen（app.js）===== */
+function openPhotoZoomMulti(photos, startIdx){ gZoomOpen(photos, startIdx||0); }
+function openPhotoZoom(src){ gZoomOpen([src.replace('/uploads/','')], 0); }
+function closePhotoZoom(){ gZoomClose(); }
 
 /* ===== 认领抽屉（就地认领）===== */
 var _listClaimPhoneConfirmed = false;
@@ -352,8 +270,11 @@ function openListClaim(itemId){
             _listClaimPhoneConfirmed = false;
             // 详情区
             var photos = it.photo ? it.photo.split(',').filter(function(s){return s.trim();}) : [];
+            var photosAttr = photos.length ? btoa(unescape(encodeURIComponent(JSON.stringify(photos)))) : '';
             var photoHtml = photos.length
-                ? '<div class="detail-photos">'+photos.map(function(p,i){return '<img class="photo-big" src="/uploads/'+p.trim()+'" onclick="window.open(this.src)">';}).join('')+'</div>'
+                ? '<div class="detail-photos" data-photos="'+photosAttr+'">'+photos.map(function(p,i){
+                    return '<img class="photo-big" src="/uploads/'+p.trim()+'" data-idx="'+i+'" onclick="handleClaimPhotoZoom(this)">';
+                  }).join('')+'</div>'
                 : '';
             document.getElementById('listClaimDetail').innerHTML =
                 '<div class="detail-panel" style="margin:0 0 16px;">'+
