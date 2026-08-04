@@ -11,8 +11,8 @@
            class="filter-tab {% if status=='all' %}active{% endif %}">全部</a>
         <a href="{{ url_for('item_list', status='待认领', q=q, date_from=date_from, date_to=date_to) }}"
            class="filter-tab {% if status=='待认领' %}active{% endif %}">待认领</a>
-        <a href="{{ url_for('item_list', status='已认领', q=q, date_from=date_from, date_to=date_to) }}"
-           class="filter-tab {% if status=='已认领' %}active{% endif %}">已认领</a>
+        <a href="{{ url_for('claims_manage') }}"
+           class="filter-tab" title="已认领的物品和撤销/修改/删除管理">已认领管理 ✅ →</a>
     </div>
 
     <!-- 搜索 -->
@@ -58,7 +58,7 @@
             </thead>
             <tbody>
                 {% for it in items %}
-                <tr onclick="showDetail({{ it.id }})">
+                <tr>
                     <td>{{ it.code }}</td>
                     <td>{{ it.name }}</td>
                     <td>{{ it.category or '—' }}</td>
@@ -159,7 +159,7 @@ function renderCards(items){
         } else {
             photoHtml = '<div class="lv-photo-top lv-photo-none"><span>'+st.icon+'</span></div>';
         }
-        // 认领信息（已认领才显示）
+        // 认领信息（已认领才显示，失物总表默认不显示已认领，此处仅备查无操作按钮）
         var claimInfo = '';
         if(it.status==='已认领'){
             claimInfo = '<div class="lv-claim-box">'+
@@ -170,17 +170,11 @@ function renderCards(items){
                 '<span class="lv-k">性别：</span><span class="lv-v">'+escapeHtml(it.claimer_gender||'未选')+'</span></div>'+
                 '<div><span class="lv-k">认领时间：</span><span class="lv-v">'+escapeHtml(it.claimed_at||'—')+'　'+
                 '<span class="lv-k">经办人：</span><span class="lv-v">'+escapeHtml(it.operator||'—')+'</span></div>'+
-                '<div class="claim-actions" style="margin-top:8px;">'+
-                    '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doUnclaim('+it.id+',\''+escapeHtml(it.code)+'\')">↩ 撤销认领</button>'+
-                    '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editClaimById('+it.id+')">✎ 修改</button>'+
-                    '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doDelete('+it.id+',\''+escapeHtml(it.code)+'\',\''+escapeHtml(it.name).replace(/'/g,"&#39;")+'\')">🗑 删除</button>'+
-                '</div>'+
                 '</div>';
         }
-        // 右下角操作按钮
+        // 右下角操作按钮：待认领保留认领入口，不含删除（管理操作去认领管理页）
         var actionHtml = it.status==='待认领'
-            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a>'+
-              '<button class="btn btn-sm btn-danger-outline" style="margin-left:8px;" onclick="event.stopPropagation();doDelete('+it.id+',\''+escapeHtml(it.code)+'\',\''+escapeHtml(it.name).replace(/'/g,"&#39;")+'\')">🗑</button></div>'
+            ? '<div class="lv-action"><a href="/admin?claim='+encodeURIComponent(it.code)+'" class="btn btn-success btn-sm" onclick="event.stopPropagation()">✓ 认领</a></div>'
             : '';
         html +=
             '<div class="lv-card" style="background:'+st.bg+';border-color:'+st.border+';">'+

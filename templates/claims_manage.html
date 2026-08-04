@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}认领管理 - 门诊失物招领{% endblock %}
+{% block content %}
+<h1 class="page-title">✅ 认领管理</h1>
+<p class="page-subtitle">已认领的物品在这里管理，可撤销认领、修改信息或删除记录（共 {{ items|length }} 条）</p>
+
+<div class="card">
+    <!-- 搜索 -->
+    <form method="get">
+        <div class="search-bar">
+            <input type="text" name="q" class="form-control" placeholder="按编号/名称/认领人/电话搜索"
+                   value="{{ q }}">
+            <button type="submit" class="btn btn-secondary btn-sm">筛选</button>
+            <a href="{{ url_for('claims_manage') }}" class="btn btn-secondary btn-sm">重置</a>
+            <div class="view-switch" style="margin-left:auto;">
+                <button type="button" class="view-btn" id="cmViewTableBtn" onclick="cmSwitchView('table')"><span>📋</span><span class="view-label">表格</span></button>
+                <button type="button" class="view-btn" id="cmViewCardBtn" onclick="cmSwitchView('card')"><span>🎴</span><span class="view-label">卡片</span></button>
+            </div>
+        </div>
+    </form>
+
+    <!-- 表格视图 -->
+    <div class="table-wrap" id="cmTableView">
+    {% if items %}
+        <table class="data">
+            <thead>
+                <tr>
+                    <th>编号</th>
+                    <th>名称</th>
+                    <th>认领人</th>
+                    <th>电话</th>
+                    <th>人群/性别</th>
+                    <th>认领时间</th>
+                    <th>经办人</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in items %}
+                <tr>
+                    <td>{{ it.code }}</td>
+                    <td>{{ it.name }}</td>
+                    <td>{{ it.claimer_name or '—' }}</td>
+                    <td>{{ it.claimer_phone or '未留' }}</td>
+                    <td>{{ it.claimer_group or '—' }}/{{ it.claimer_gender or '—' }}</td>
+                    <td>{{ it.claimed_at or '—' }}</td>
+                    <td>{{ it.operator or '—' }}</td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editClaimById({{ it.id }})">✎ 修改</button>
+                        <button class="btn btn-sm btn-danger-outline" onclick="doUnclaim({{ it.id }}, '{{ it.code }}')">↩ 撤销</button>
+                        <button class="btn btn-sm btn-danger-outline" onclick="doDelete({{ it.id }}, '{{ it.code }}', '{{ it.name|replace("'", "&#39;") }}')">🗑 删除</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty">没有已认领的物品记录</div>
+    {% endif %}
+    </div>
+
+    <!-- 卡片视图 -->
+    <div id="cmCardView" style="display:none;">
+        <div class="lv-grid" id="cmCardGrid"></div>
+        <div class="empty" id="cmCardEmpty" style="display:none;">没有已认领的物品记录</div>
+    </div>
+</div>
+
+<script id="cmItemsData" type="application/json">{{ items|tojson|safe }}</script>
+{% endblock %}
+
+{% block script %}
+<script>
+/* 类别样式（复用总表的映射）*/
+var CATEGORY_STYLE = {
+    "证件":{icon:"🪪",bg:"#fdedee",border:"#f5c2c7"},
+    "钱包":{icon:"👛",bg:"#fdedee",border:"#f5c2c7"},
+    "手机/电子产品":{icon:"📱",bg:"#ecedf0",border:"#cfd2d8"},
+    "钥匙":{icon:"🔑",bg:"#ecedf0",border:"#cfd2d8"},
+    "病历/检查单":{icon:"📄",bg:"#f6f6f4",border:"#e0e0dc"},
+    "衣物":{icon:"👕",bg:"#e7f0fe",border:"#c2dbf7"},
+    "水杯/雨伞":{icon:"☂️",bg:"#e9f5ea",border:"#c6e3c9"},
+    "其他":{icon:"📦",bg:"#f3f4f6",border:"#d9dde3"}
+};
+function getCatStyle(cat){ return CATEGORY_STYLE[cat] || CATEGORY_STYLE["其他"]; }
+
+/* 视图切换 */
+function cmSwitchView(view){
+    document.getElementById('cmTableView').style.display = (view==='table')?'block':'none';
+    document.getElementById('cmCardView').style.display = (view==='card')?'block':'none';
+    document.getElementById('cmViewTableBtn').classList.toggle('active', view==='table');
+    document.getElementById('cmViewCardBtn').classList.toggle('active', view==='card');
+    localStorage.setItem('lf_cm_view', view);
+}
+
+/* 卡片轮播切换（复用）*/
+function slideCard(btn, dir){
+    var car = btn.closest('.lv-carousel');
+    var count = parseInt(car.getAttribute('data-count'));
+    var idx = parseInt(car.getAttribute('data-idx')) + dir;
+    if(idx<0) idx=count-1; if(idx>=count) idx=0;
+    car.setAttribute('data-idx', idx);
+    car.querySelector('.lv-track').style.transform = 'translateX(-'+(idx*100)+'%)';
+    car.querySelectorAll('.lv-dot').forEach(function(d,i){d.classList.toggle('active', i===idx);});
+}
+
+/* 渲染已认领卡片 */
+function cmRenderCards(items){
+    var grid = document.getElementById('cmCardGrid');
+    var empty = document.getElementById('cmCardEmpty');
+    if(!items || items.length===0){ grid.innerHTML=''; empty.style.display='block'; return; }
+    empty.style.display='none';
+    var html='';
+    items.forEach(function(it){
+        var st = getCatStyle(it.category);
+        var photos = it.photo ? it.photo.split(',').filter(function(s){return s.trim();}) : [];
+        var photoHtml;
+        if(photos.length>0){
+            var imgs = photos.map(function(p){return '<div class="lv-slide"><img src="/uploads/'+p.trim()+'"></div>';}).join('');
+            var arrows = photos.length>1 ?
+                ('<button class="lv-arrow lv-arrow-l" onclick="event.stopPropagation();slideCard(this,-1)">‹</button>'+
+                 '<button class="lv-arrow lv-arrow-r" onclick="event.stopPropagation();slideCard(this,1)">›</button>'+
+                 '<div class="lv-dots">'+photos.map(function(_,i){return '<span class="lv-dot'+(i===0?' active':'')+'"></span>';}).join('')+'</div>') : '';
+            photoHtml = '<div class="lv-carousel" data-idx="0" data-count="'+photos.length+'" onclick="event.stopPropagation();openPhotoZoomMulti('+JSON.stringify(photos.map(function(p){return p.trim();}))+',0)"><div class="lv-track">'+imgs+'</div>'+arrows+'<span class="lv-zoom-hint">🔍 点击放大</span></div>';
+        } else {
+            photoHtml = '<div class="lv-photo-top lv-photo-none"><span>'+st.icon+'</span></div>';
+        }
+        html +=
+            '<div class="lv-card" style="background:'+st.bg+';border-color:'+st.border+';">'+
+                '<div class="lv-card-head">'+
+                    '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
+                    '<span class="lv-cat-icon" style="color:'+st.border+';">'+st.icon+'</span>'+
+                    '<span class="tag tag-returned">已认领</span>'+
+                '</div>'+
+                '<div class="lv-card-title">'+escapeHtml(it.name)+'</div>'+
+                photoHtml+
+                '<div class="lv-detail-grid">'+
+                    '<div><span class="lv-k">认领人：</span><span class="lv-v">'+escapeHtml(it.claimer_name||'—')+'</span></div>'+
+                    '<div><span class="lv-k">电话：</span><span class="lv-v">'+escapeHtml(it.claimer_phone||'未留')+'</span></div>'+
+                    '<div><span class="lv-k">人群：</span><span class="lv-v">'+escapeHtml(it.claimer_group||'未选')+'</span></div>'+
+                    '<div><span class="lv-k">性别：</span><span class="lv-v">'+escapeHtml(it.claimer_gender||'未选')+'</span></div>'+
+                    '<div><span class="lv-k">认领时间：</span><span class="lv-v">'+escapeHtml(it.claimed_at||'—')+'</span></div>'+
+                    '<div><span class="lv-k">经办人：</span><span class="lv-v">'+escapeHtml(it.operator||'—')+'</span></div>'+
+                '</div>'+
+                '<div class="lv-claim-box">'+
+                    '<div class="claim-actions" style="margin-top:0;">'+
+                        '<button class="btn btn-sm btn-secondary" onclick="event.stopPropagation();editClaimById('+it.id+')">✎ 修改信息</button>'+
+                        '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doUnclaim('+it.id+',\''+escapeHtml(it.code)+'\')">↩ 撤销认领</button>'+
+                        '<button class="btn btn-sm btn-danger-outline" onclick="event.stopPropagation();doDelete('+it.id+',\''+escapeHtml(it.code)+'\',\''+escapeHtml(it.name).replace(/'/g,"&#39;")+'\')">🗑 删除记录</button>'+
+                    '</div>'+
+                '</div>'+
+            '</div>';
+    });
+    grid.innerHTML = html;
+}
+
+/* 初始化 */
+(function(){
+    var saved = localStorage.getItem('lf_cm_view') || 'table';
+    cmSwitchView(saved);
+    var items = JSON.parse(document.getElementById('cmItemsData').textContent);
+    cmRenderCards(items);
+})();
+</script>
+{% endblock %}

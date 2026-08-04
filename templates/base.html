@@ -19,6 +19,9 @@
                 <a href="{{ url_for('item_list') }}" class="{% if request.endpoint == 'item_list' %}active{% endif %}">
                     <span class="nav-icon">📋</span><span>失物总表</span>
                 </a>
+                <a href="{{ url_for('claims_manage') }}" class="{% if request.endpoint == 'claims_manage' %}active{% endif %}">
+                    <span class="nav-icon">✅</span><span>认领管理</span>
+                </a>
                 <a href="{{ url_for('reports') }}" class="{% if request.endpoint == 'reports' %}active{% endif %}">
                     <span class="nav-icon">📬</span><span>报失处理</span>
                 </a>

@@ -689,7 +689,7 @@ def claim_api():
 @login_required
 def item_list():
     db = get_db()
-    status = request.args.get("status", "all")
+    status = request.args.get("status", "待认领")  # 默认只看待认领
     q = request.args.get("q", "").strip()
     date_from = norm_date(request.args.get("date_from", ""))
     date_to = norm_date(request.args.get("date_to", ""))
@@ -714,6 +714,25 @@ def item_list():
     items = [dict(r) for r in items]  # 转 dict，供模板 tojson 序列化
     return render_template("list.html", items=items, status=status,
                            q=q, date_from=date_from, date_to=date_to)
+
+
+# ============================================================
+# 路由：认领管理（已认领物品 + 撤销/修改/删除）
+# ============================================================
+@app.route("/claims")
+@login_required
+def claims_manage():
+    db = get_db()
+    q = request.args.get("q", "").strip()
+    sql = "SELECT * FROM items WHERE status='已认领'"
+    params = []
+    if q:
+        sql += " AND (code LIKE ? OR name LIKE ? OR description LIKE ? OR claimer_name LIKE ? OR claimer_phone LIKE ?)"
+        params += [f"%{q}%"] * 5
+    sql += " ORDER BY claimed_at DESC"
+    items = db.execute(sql, params).fetchall()
+    items = [dict(r) for r in items]
+    return render_template("claims_manage.html", items=items, q=q)
 
 
 # ============================================================
