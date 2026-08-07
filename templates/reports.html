@@ -71,7 +71,16 @@
                 <input type="hidden" name="note" id="noteHidden_{{ r.id }}">
                 <button type="submit" name="action" value="register" class="btn btn-sm" onclick="document.getElementById('noteHidden_{{ r.id }}').value=document.getElementById('note_{{ r.id }}').value;return confirm('将此报失登记入失物总表（标记为患者报失），继续吗？')">📥 登记入总表</button>
             </form>
-            <button class="btn btn-success btn-sm" onclick="openReportClaim({{ r.id }}, {{ r|tojson|safe }})">✓ 已找到</button>
+            <button class="btn btn-success btn-sm"
+                    data-id="{{ r.id }}"
+                    data-name="{{ r.item_name }}"
+                    data-category="{{ r.item_category or '' }}"
+                    data-desc="{{ r.description or '' }}"
+                    data-location="{{ r.lost_location or '' }}"
+                    data-photo="{{ r.photo or '' }}"
+                    data-owner="{{ r.owner_name or '' }}"
+                    data-phone="{{ r.owner_phone or '' }}"
+                    onclick="openReportClaim(this)">✓ 已找到</button>
             <form method="post" style="display:inline;">
                 <input type="hidden" name="report_id" value="{{ r.id }}">
                 <input type="hidden" name="note" id="noteHiddenIg_{{ r.id }}">
@@ -119,8 +128,18 @@ function nowLocalStr(){
     return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
 }
 
-/* 报失「已找到」→ 弹认领抽屉 */
-function openReportClaim(reportId, rep){
+/* 报失「已找到」→ 弹认领抽屉（从按钮data属性读取报失信息）*/
+function openReportClaim(btn){
+    var rep = {
+        id: btn.getAttribute('data-id'),
+        item_name: btn.getAttribute('data-name'),
+        item_category: btn.getAttribute('data-category'),
+        description: btn.getAttribute('data-desc'),
+        lost_location: btn.getAttribute('data-location'),
+        photo: btn.getAttribute('data-photo'),
+        owner_name: btn.getAttribute('data-owner'),
+        owner_phone: btn.getAttribute('data-phone')
+    };
     var photoHtml = rep.photo
         ? '<div class="detail-photos"><img class="photo-big" src="/uploads/'+rep.photo+'" style="cursor:zoom-in;" onclick="gZoomOpen([\''+rep.photo+'\'],0)"></div>'
         : '';
@@ -136,7 +155,7 @@ function openReportClaim(reportId, rep){
         '<div style="grid-column:1/-1;"><span class="k">特征：</span><br><span class="v" style="color:#c62828;font-weight:600;">'+escapeHtml(rep.description||'—')+'</span></div>'+
         '</div></div>';
     document.getElementById('reportClaimForm').innerHTML =
-        '<form onsubmit="event.preventDefault();submitReportClaim('+reportId+')">'+
+        '<form onsubmit="event.preventDefault();submitReportClaim('+rep.id+')">'+
         '<div class="form-row2">'+
         '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" id="rc_name" class="form-control" value="'+escapeHtml(rep.owner_name||'')+'" required></div>'+
         '<div class="form-group"><label>认领人电话</label><input type="text" id="rc_phone" class="form-control" value="'+escapeHtml(rep.owner_phone||'')+'"></div>'+
