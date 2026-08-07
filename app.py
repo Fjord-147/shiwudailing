@@ -505,6 +505,18 @@ def report_found_claim(report_id):
     else:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+    # 认领人照片（base64，可选）
+    claimer_photo = None
+    cp_data = request.form.get("claimer_photo_data", "")
+    if cp_data and cp_data.startswith("data:image"):
+        import base64 as _b64
+        header, b64 = cp_data.split(",", 1)
+        ext = "png" if "png" in header else "jpeg"
+        fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
+        with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
+            f.write(_b64.b64decode(b64))
+        claimer_photo = fname
+
     # 生成物品（患者报失 + 直接已认领）
     code = generate_code(db)
     db.execute(
@@ -512,13 +524,13 @@ def report_found_claim(report_id):
            (code, name, category, description, photo, found_location,
             found_time, founder, status, created_at, source, registered_by,
             claimer_name, claimer_phone, claimer_group, claimer_gender,
-            feature_verified, claimed_at, operator)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            feature_verified, claimed_at, operator, claimer_photo)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (code, rep["item_name"], rep["item_category"], rep["description"],
          rep["photo"], rep["lost_location"], rep["lost_time"], "患者报失",
          "已认领", now, "患者报失", operator,
          claimer_name, claimer_phone or None, claimer_group or None,
-         claimer_gender or None, 1, now, operator)
+         claimer_gender or None, 1, now, operator, claimer_photo)
     )
     new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
     # 报失标记已找到
