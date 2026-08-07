@@ -602,16 +602,53 @@ table.data tbody tr { cursor: pointer; }
     .navbar { padding: 0 14px; }
     .navbar .brand { font-size: 16px; margin-right: 14px; }
     .navbar .nav-links a { padding: 8px 10px; font-size: 14px; }
-    /* 后台侧边栏：窄屏收窄成图标条 */
-    .sidebar { width: 64px; }
-    .sidebar-brand { font-size: 24px; padding: 18px 0 14px; }
-    .sidebar-brand span { display: none; }
-    .sidebar-nav a { justify-content: center; padding: 14px 0; }
-    .sidebar-nav a span:last-child { display: none; }
-    .sidebar-nav a.active { border-left: none; border-bottom: 3px solid #ffd54f; }
-    .sidebar-footer .user-info { display: none; }
-    .sidebar-footer { padding: 12px 0; text-align: center; }
-    .sidebar-footer .user-action { margin: 0 6px; }
+    /* 后台侧边栏：窄屏改成底部固定导航栏（像手机App）*/
+    .admin-layout { flex-direction: column; }
+    .sidebar {
+        order: 2;
+        width: 100%;
+        height: auto;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        flex-direction: row;
+        align-items: center;
+        padding: 0;
+        height: 56px;
+        z-index: 100;
+        box-shadow: 0 -2px 8px rgba(0,0,0,.1);
+    }
+    .sidebar-brand { display: none; }
+    .sidebar-nav {
+        flex: 1;
+        flex-direction: row;
+        display: flex;
+        padding: 0;
+        overflow-x: auto;
+    }
+    .sidebar-nav a {
+        flex: 1;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2px;
+        padding: 6px 2px;
+        font-size: 11px;
+        border-left: none;
+        border-bottom: 3px solid transparent;
+        min-width: 56px;
+    }
+    .sidebar-nav a span:last-child { display: inline; font-size: 10px; }
+    .sidebar-nav .nav-icon { font-size: 20px; }
+    .sidebar-nav a.active {
+        background: rgba(255,255,255,.15);
+        border-left: none;
+        border-bottom: 3px solid #ffd54f;
+    }
+    .nav-badge { position: absolute; top: 2px; right: 50%; transform: translateX(20px); margin-left: 0; }
+    .sidebar-footer { display: none; }  /* 手机端隐藏用户区，去工作台操作 */
+    /* 内容区：底部留出导航栏空间 */
+    .content-area { padding-bottom: 60px; }
     /* 全局触摸优化：输入框16px防iOS缩放，按钮≥44px */
     .form-control { font-size: 16px; }
     .btn { min-height: 44px; }
@@ -619,6 +656,22 @@ table.data tbody tr { cursor: pointer; }
     .back-btn { min-height: 40px; padding: 8px 18px; font-size: 15px; }
     /* 表格横向滚动更顺滑 */
     .table-wrap { -webkit-overflow-scrolling: touch; }
+    /* 后台工作台：按钮行换行、搜索框占满 */
+    .btn-row { flex-wrap: wrap; gap: 8px; }
+    .btn-row > form, .btn-row > div { width: 100%; }
+    .btn-row .btn { flex: 1; min-width: 0; }
+    .page-title { font-size: 20px; }
+    .page-subtitle { font-size: 13px; }
+    /* 统计卡片数字小一点 */
+    .stat-card { padding: 16px; }
+    .stat-card .num { font-size: 28px; }
+    /* 抽屉头部触摸友好 */
+    .drawer-head { padding: 14px 16px; }
+    .drawer-head h2 { font-size: 16px; }
+    .drawer-body { padding: 16px; }
+    /* 卡片视图：手机单列 */
+    .lv-grid { grid-template-columns: 1fr; }
+    .lv-card { width: 100%; }
 }
 
 /* ============================================================
