@@ -87,10 +87,10 @@
                             <span class="tag tag-source" style="margin-top:2px;display:inline-block;">🙋 患者报失</span>
                         {% endif %}
                     </td>
-                    <!-- 捡到人：患者报失固定不可改，否则可点单元格编辑 -->
+                    <!-- 捡到人：患者报失时状态列已有标记，此处不重复显示；否则可点编辑 -->
                     <td onclick="event.stopPropagation()">
                         {% if it.source == '患者报失' %}
-                            <span class="tag tag-source">患者报失</span>
+                            <span style="color:#cbd5e1;">—</span>
                         {% else %}
                             <span class="cell-edit" onclick="editFounderCell({{ it.id }}, this)" title="点击修改">
                                 {{ it.founder or '—' }}

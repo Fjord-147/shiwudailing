@@ -94,6 +94,15 @@
                     </div>
                 </div>
                 <div class="form-group" style="margin-bottom:14px;">
+                    <label>登记人</label>
+                    <select name="registered_by" class="form-control">
+                        <option value="{{ current_user }}" selected>{{ current_user }}</option>
+                        {% for s in staff_names %}
+                            {% if s != current_user %}<option value="{{ s }}">{{ s }}</option>{% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
                     <label>存放位置 <span class="req">*</span></label>
                     <input type="text" name="storage_location" id="storageInput" class="form-control" placeholder="如：导诊台2号抽屉、3号柜" oninput="checkStorage()">
                     <div class="field-tip" id="storageTip" style="display:none;">请填写存放位置，方便后续取物</div>

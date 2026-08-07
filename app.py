@@ -595,7 +595,8 @@ def register():
 
         code = generate_code(db)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        registered_by = session.get("staff_name", "")  # 登记人=当前操作导医
+        # 登记人：优先前端传的（可改），没传则用当前登录导医
+        registered_by = request.form.get("registered_by", "").strip() or session.get("staff_name", "")
         db.execute(
             """INSERT INTO items
                (code, name, category, description, photo, found_location,
