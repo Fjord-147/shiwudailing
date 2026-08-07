@@ -342,7 +342,7 @@ function openListClaim(itemId){
                 '<input type="hidden" name="item_id" value="'+it.id+'">'+
                 '<div class="form-row2">'+
                 '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" name="claimer_name" class="form-control" required></div>'+
-                '<div class="form-group"><label>认领人电话</label><input type="text" name="claimer_phone" class="form-control" placeholder="选填"></div>'+
+                '<div class="form-group"><label>认领人电话</label><input type="text" name="claimer_phone" class="form-control" placeholder="选填，不填将提示确认"></div>'+
                 '</div>'+
                 '<div class="form-group" style="margin-bottom:14px;"><label>认领时间</label>'+
                 '<input type="datetime-local" name="claimed_at" class="form-control" value="'+nowLocalStr()+'"></div>'+
@@ -352,6 +352,24 @@ function openListClaim(itemId){
                 '</div>'+
                 '<input type="hidden" name="operator" value="{{ current_user }}">'+
                 '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" name="feature_verified" value="1"><span>我已核对物品特征无误</span></label>'+
+                '<div class="form-group" style="margin-bottom:14px;">'+
+                '<label>认领人照片 <span style="color:#6b7280;font-weight:normal;font-size:13px;">（选填，老人等记不清电话时可留照备查）</span></label>'+
+                '<div class="photo-box">'+
+                '<div class="photo-tabs">'+
+                '<button type="button" class="photo-tab active" data-tab="camera" data-tab-group="lcphoto" onclick="switchPhotoTab(this,\'lcphoto\')">📷 拍照</button>'+
+                '<button type="button" class="photo-tab" data-tab="upload" data-tab-group="lcphoto" onclick="switchPhotoTab(this,\'lcphoto\')">📁 上传</button>'+
+                '</div>'+
+                '<div id="lcphoto_camera">'+
+                '<video id="lcphoto_video" autoplay playsinline></video>'+
+                '<div style="margin-top:8px;"><button type="button" class="btn btn-sm" onclick="capturePhoto(\'lcphoto_video\',\'lcphoto_preview\',\'lcphoto_data\')">📸 抓拍</button></div>'+
+                '</div>'+
+                '<div id="lcphoto_upload" style="display:none;">'+
+                '<input type="file" name="claimer_photo_file" id="lcphoto_file" accept="image/*" class="form-control" onchange="previewFile(this,\'lcphoto_preview\',\'lcphoto_data\')">'+
+                '</div>'+
+                '<img id="lcphoto_preview" src="" style="display:none;">'+
+                '<input type="hidden" name="claimer_photo_data" id="lcphoto_data">'+
+                '</div>'+
+                '</div>'+
                 '<button type="submit" class="btn btn-success btn-block">✓ 确认认领</button>'+
                 '<div style="font-size:12px;color:#6b7280;margin-top:8px;text-align:center;">不传照片也能正常认领</div>'+
                 '</form>';
@@ -369,6 +387,10 @@ function submitListClaim(itemId){
         _listClaimPhoneConfirmed = true;
     }
     var fd = new FormData(form);
+    // 认领人照片：拍照base64和文件二选一，优先拍照
+    var photoData = document.getElementById('lcphoto_data').value;
+    if(photoData){ fd.delete('claimer_photo_file'); }
+    stopCamera();  // 关摄像头
     fetch('/claim', {method:'POST', body: fd, headers:{'X-Requested-With':'fetch'}})
         .then(function(r){return r.json();})
         .then(function(d){
