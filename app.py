@@ -1076,7 +1076,7 @@ def serve_upload(filename):
 if __name__ == "__main__":
     init_db()
     print("=" * 50)
-    print("  门诊失物招领登记系统 已启动")
+    print("  和康中医医院失物招领系统 已启动")
     print(f"  本机访问：  http://127.0.0.1:{config.PORT}")
     print(f"  其他电脑：  http://<本机IP>:{config.PORT}")
     print(f"  进入口令：  {config.ACCESS_PASSWORD}")

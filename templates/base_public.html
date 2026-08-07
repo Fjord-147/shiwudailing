@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}门诊失物招领{% endblock %}</title>
+    <title>{% block title %}和康失物招领{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <nav class="navbar public-nav">
         <button class="back-btn public-back" onclick="history.back()" title="返回上一页">←</button>
-        <div class="brand">🏥 门诊失物招领</div>
+        <div class="brand">🏥 和康中医医院 · 失物招领</div>
         <div class="nav-links">
             <a href="{{ url_for('public_index') }}" class="{% if request.endpoint == 'public_index' %}active{% endif %}">失物招领</a>
             <a href="{{ url_for('public_report') }}" class="{% if request.endpoint == 'public_report' %}active{% endif %}">我要报失</a>

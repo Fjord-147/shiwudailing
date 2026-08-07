@@ -1,14 +1,32 @@
 {% extends "base_public.html" %}
-{% block title %}失物招领 - 门诊{% endblock %}
+{% block title %}失物招领 - 和康中医医院{% endblock %}
 {% block content %}
 
 <div class="public-hero">
     <h1>失物招领</h1>
-    <p>这里展示门诊捡到的、正在等待认领的物品。看到您丢失的物品，请到<strong>门诊导医台</strong>当面核对认领。</p>
+    <p>和康中医医院捡到的物品在此展示，看到您丢失的请到<strong>导医台</strong>核对认领</p>
+</div>
+
+<!-- 两个显眼大入口：找东西 / 报失 -->
+<div class="entry-cards">
+    <a href="#itemList" class="entry-card entry-find">
+        <div class="entry-icon">🔍</div>
+        <div class="entry-text">
+            <div class="entry-title">我丢了东西</div>
+            <div class="entry-desc">看看有没有被捡到</div>
+        </div>
+    </a>
+    <a href="{{ url_for('public_report') }}" class="entry-card entry-report">
+        <div class="entry-icon">📝</div>
+        <div class="entry-text">
+            <div class="entry-title">我捡到东西 / 没找到</div>
+            <div class="entry-desc">登记报失，等通知</div>
+        </div>
+    </a>
 </div>
 
 <!-- 搜索 + 类别筛选 -->
-<form method="get" class="public-toolbar">
+<form method="get" class="public-toolbar" id="itemList">
     <input type="text" name="q" class="form-control" placeholder="搜索物品名称、特征、地点..."
            value="{{ q }}">
     <button type="submit" class="btn btn-secondary btn-sm">🔍 搜索</button>
