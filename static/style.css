@@ -612,6 +612,13 @@ table.data tbody tr { cursor: pointer; }
     .sidebar-footer .user-info { display: none; }
     .sidebar-footer { padding: 12px 0; text-align: center; }
     .sidebar-footer .user-action { margin: 0 6px; }
+    /* 全局触摸优化：输入框16px防iOS缩放，按钮≥44px */
+    .form-control { font-size: 16px; }
+    .btn { min-height: 44px; }
+    /* 返回栏触摸友好 */
+    .back-btn { min-height: 40px; padding: 8px 18px; font-size: 15px; }
+    /* 表格横向滚动更顺滑 */
+    .table-wrap { -webkit-overflow-scrolling: touch; }
 }
 
 /* ============================================================
@@ -824,12 +831,52 @@ table.data tbody tr { cursor: pointer; }
 
 /* 公众页移动端适配 */
 @media (max-width: 768px) {
-    .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+    /* 卡片：手机两列，间距紧凑 */
+    .card-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .goods-name { font-size: 15px; }
-    .public-hero h1 { font-size: 22px; }
-    .public-hero p { font-size: 14px; }
+    .goods-info { padding: 8px 10px; }
+    .goods-meta { font-size: 12px; }
+    .goods-time { font-size: 11px; }
+    /* 导航：手机紧凑 */
+    .public-nav { padding: 0 12px; height: 50px; }
+    .public-nav .brand { font-size: 15px; margin-right: 8px; }
+    .public-nav .nav-links { gap: 2px; }
+    .public-nav .nav-links a { padding: 6px 8px; font-size: 13px; }
+    .public-nav .admin-entry { padding: 5px 10px; font-size: 12px; }
+    .public-back { width: 28px; height: 28px; font-size: 16px; margin-right: 4px; }
+    /* 标题区缩小 */
+    .public-hero { padding: 16px 0 12px; }
+    .public-hero h1 { font-size: 20px; }
+    .public-hero p { font-size: 13px; line-height: 1.5; }
+    /* 搜索栏：手机单行可换行 */
+    .public-toolbar { gap: 6px; }
+    .public-toolbar .form-control { max-width: 100%; flex: 1; min-height: 40px; }
+    .public-toolbar .btn { min-height: 40px; padding: 8px 14px; }
+    /* 筛选标签：可横向滚动，不挤 */
+    .filter-tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
+    .filter-tab { white-space: nowrap; flex-shrink: 0; }
+    /* 卡片照片比例 */
+    .goods-photo { aspect-ratio: 1 / 1; }
+    /* 报失页表单：字段更大更易点 */
+    .form-control { min-height: 44px; font-size: 16px; }  /* 16px防iOS缩放 */
+    .form-group label { font-size: 14px; }
+    .checkbox-row { padding: 12px; font-size: 14px; }
+    .checkbox-row input { width: 22px; height: 22px; }
+    .btn { min-height: 44px; }  /* 触摸目标≥44px */
+    .btn-sm { min-height: 36px; }
+    /* 详情弹窗手机适配 */
+    .detail-photos { flex-direction: row; }
+    /* 底部 */
+    .public-footer { padding: 18px 12px; font-size: 12px; }
+    .public-container { padding: 0 12px; }
     .report-card-body { flex-direction: column; }
     .report-photo { width: 100%; height: 180px; }
+}
+/* 超小屏（≤480px）：卡片照片更方，标题更小 */
+@media (max-width: 480px) {
+    .public-hero h1 { font-size: 18px; }
+    .goods-photo-placeholder { font-size: 40px; }
+    .goods-card:hover { transform: none; }  /* 手机别悬浮上移，避免误触 */
 }
 
 /* ============================================================
