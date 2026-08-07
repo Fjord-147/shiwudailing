@@ -120,6 +120,27 @@ a:hover { text-decoration: underline; }
     font-weight: 600;
 }
 .sidebar-nav .nav-icon { font-size: 18px; flex-shrink: 0; }
+/* 侧边栏报失角标（红色数字，像未读消息）*/
+.sidebar-nav a { position: relative; }
+.nav-badge {
+    background: var(--danger);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    line-height: 18px;
+    text-align: center;
+    border-radius: 9px;
+    padding: 0 5px;
+    margin-left: auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+    animation: badgePulse 2s infinite;
+}
+@keyframes badgePulse {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+}
 
 /* 内容区顶部返回栏 */
 .back-bar {
@@ -781,6 +802,8 @@ table.data tbody tr { cursor: pointer; }
 
 /* 已找到/已忽略的静默标签 */
 .tag-muted { background: #eceff1; color: #607d8b; }
+/* 患者报失来源标记（紫色）*/
+.tag-source { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; }
 
 /* 公众页移动端适配 */
 @media (max-width: 768px) {

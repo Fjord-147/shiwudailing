@@ -80,7 +80,8 @@ def init_db():
             claimer_group  TEXT,                   -- 认领人群：老人/小孩/青年/其他
             claimer_gender TEXT,                   -- 认领人性别：男/女
             storage_location TEXT,                 -- 存放位置（如导诊台2号抽屉）
-            hidden_photos TEXT                     -- 隐藏的照片文件名（逗号分隔，公众看不到）
+            hidden_photos TEXT,                    -- 隐藏的照片文件名（逗号分隔，公众看不到）
+            source        TEXT                     -- 来源：空=导医登记 / 患者报失=从报失转入
         )
     """)
     # 兼容旧库：若表已存在但缺字段，自动补上
@@ -97,6 +98,8 @@ def init_db():
         conn.execute("ALTER TABLE items ADD COLUMN storage_location TEXT")
     if "hidden_photos" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN hidden_photos TEXT")
+    if "source" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN source TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -399,9 +402,34 @@ def reports():
             flash("报失记录不存在。", "error")
             return redirect(url_for("reports"))
 
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # ===== 登记动作：把报失转成失物总表里的一条待认领物品 =====
+        if action == "register":
+            code = generate_code(db)
+            db.execute(
+                """INSERT INTO items
+                   (code, name, category, description, photo, found_location,
+                    found_time, founder, status, created_at, source)
+                   VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失')""",
+                (code, rep["item_name"], rep["item_category"], rep["description"],
+                 rep["photo"], rep["lost_location"], rep["lost_time"],
+                 handled_by or "导医", now)
+            )
+            new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
+            # 报失标记为已登记，记录关联的物品id
+            db.execute(
+                """UPDATE lost_reports SET status='已登记', note=?, handled_by=?, handled_at=?,
+                   matched_item_id=? WHERE id=?""",
+                (note or "已转入失物总表", handled_by, now, new_item_id, report_id)
+            )
+            db.commit()
+            flash(f"已登记入失物总表，编号 {code}（标记为患者报失）。", "success")
+            return redirect(url_for("reports"))
+
+        # ===== 其他动作：标记状态 =====
         status_map = {"found": "已找到", "ignore": "已忽略", "reopen": "待查找"}
         new_status = status_map.get(action, rep["status"])
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         db.execute(
             """UPDATE lost_reports SET status=?, note=?, handled_by=?, handled_at=? WHERE id=?""",
             (new_status, note, handled_by, now, report_id)
@@ -427,9 +455,19 @@ def reports():
         "待查找": db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='待查找'").fetchone()["c"],
         "已找到": db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='已找到'").fetchone()["c"],
         "已忽略": db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='已忽略'").fetchone()["c"],
+        "已登记": db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='已登记'").fetchone()["c"],
     }
     return render_template("reports.html", reports=all_reports, status=status,
                            q=q, counts=counts)
+
+
+@app.route("/api/reports/pending_count")
+@login_required
+def reports_pending_count():
+    """侧边栏角标：返回待查找的报失数量。"""
+    db = get_db()
+    c = db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='待查找'").fetchone()["c"]
+    return jsonify({"ok": True, "count": c})
 
 
 # ============================================================

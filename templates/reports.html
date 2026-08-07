@@ -8,6 +8,8 @@
 <div class="filter-tabs">
     <a href="{{ url_for('reports', status='待查找', q=q) }}"
        class="filter-tab {% if status=='待查找' %}active{% endif %}">待查找 ({{ counts['待查找'] }})</a>
+    <a href="{{ url_for('reports', status='已登记', q=q) }}"
+       class="filter-tab {% if status=='已登记' %}active{% endif %}">已登记 ({{ counts['已登记'] }})</a>
     <a href="{{ url_for('reports', status='已找到', q=q) }}"
        class="filter-tab {% if status=='已找到' %}active{% endif %}">已找到 ({{ counts['已找到'] }})</a>
     <a href="{{ url_for('reports', status='已忽略', q=q) }}"
@@ -64,7 +66,8 @@
         {% if r.status == '待查找' %}
         <form method="post" class="report-actions">
             <input type="hidden" name="report_id" value="{{ r.id }}">
-            <input type="text" name="note" class="form-control" placeholder="处理备注（选填，如：已匹配编号XXX / 电话联系未果）">
+            <input type="text" name="note" class="form-control" placeholder="处理备注（选填）">
+            <button type="submit" name="action" value="register" class="btn btn-sm" onclick="return confirm('将此报失登记入失物总表（标记为患者报失），继续吗？')">📥 登记入总表</button>
             <button type="submit" name="action" value="found" class="btn btn-success btn-sm">✓ 已找到</button>
             <button type="submit" name="action" value="ignore" class="btn btn-secondary btn-sm">忽略</button>
         </form>

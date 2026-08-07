@@ -209,6 +209,7 @@ function renderCards(items){
                     '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
                     '<span class="lv-cat-icon" style="color:'+st.border+';" title="'+escapeHtml(it.category||'')+'">'+st.icon+'</span>'+
                     statusTag+
+                    (it.source==='患者报失' ? '<span class="tag tag-source">🙋 患者报失</span>' : '')+
                 '</div>'+
                 '<div class="lv-card-title">'+escapeHtml(it.name)+'</div>'+
                 photoHtml+

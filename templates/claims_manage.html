@@ -131,6 +131,7 @@ function cmRenderCards(items){
                     '<span class="lv-code">编号 '+escapeHtml(it.code)+'</span>'+
                     '<span class="lv-cat-icon" style="color:'+st.border+';">'+st.icon+'</span>'+
                     '<span class="tag tag-returned">已认领</span>'+
+                    (it.source==='患者报失' ? '<span class="tag tag-source">🙋 患者报失</span>' : '')+
                 '</div>'+
                 '<div class="lv-card-title">'+escapeHtml(it.name)+'</div>'+
                 photoHtml+

@@ -24,6 +24,7 @@
                 </a>
                 <a href="{{ url_for('reports') }}" class="{% if request.endpoint == 'reports' %}active{% endif %}">
                     <span class="nav-icon">📬</span><span>报失处理</span>
+                    <span class="nav-badge" id="reportsBadge" style="display:none;"></span>
                 </a>
                 <a href="{{ url_for('stats') }}" class="{% if request.endpoint == 'stats' %}active{% endif %}">
                     <span class="nav-icon">📊</span><span>统计导出</span>
@@ -57,6 +58,24 @@
     </div>
 
     <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script>
+    /* 侧边栏报失角标：轮询待处理数 */
+    function refreshReportsBadge(){
+        fetch("{{ url_for('reports_pending_count') }}").then(function(r){return r.json();})
+            .then(function(d){
+                var b = document.getElementById('reportsBadge');
+                if(!b) return;
+                if(d.ok && d.count > 0){
+                    b.textContent = d.count > 99 ? '99+' : d.count;
+                    b.style.display = 'inline-block';
+                }else{
+                    b.style.display = 'none';
+                }
+            }).catch(function(){});
+    }
+    refreshReportsBadge();
+    setInterval(refreshReportsBadge, 60000);  // 每分钟刷新
+    </script>
     {% block script %}{% endblock %}
     {% endblock %}
 </body>
