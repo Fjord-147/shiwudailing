@@ -1,15 +1,15 @@
 /* ===== 全局 ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-    --primary: #2a7f6b;        /* 青绿，中医草本感 */
-    --primary-dark: #1d5e4e;   /* 深青绿 */
-    --primary-light: #e8f5f0;  /* 浅青绿底 */
-    --accent: #c8a45c;         /* 古铜金，点缀高亮 */
+    --primary: #0891b2;        /* 明亮青蓝，清新 */
+    --primary-dark: #0e7490;   /* 深青蓝 */
+    --primary-light: #ecfeff;  /* 极浅青蓝底 */
+    --accent: #f59e0b;         /* 暖金点缀 */
     --danger: #c62828;
-    --success: #2e7d32;
-    --warn: #f57c00;
+    --success: #16a34a;
+    --warn: #f59e0b;
     --gray: #6b7280;
-    --light: #f7f9f8;          /* 柔和底色 */
+    --light: #f8fafc;          /* 明亮底色 */
     --border: #e2e8f0;
 }
 body {
@@ -321,7 +321,7 @@ a:hover { text-decoration: underline; }
     padding: 18px 24px;
     border-radius: 12px;
     margin-bottom: 20px;
-    box-shadow: 0 4px 14px rgba(42,127,107,.25);
+    box-shadow: 0 4px 14px rgba(8,145,178,.25);
 }
 .brand-banner-title { font-size: 20px; font-weight: 700; }
 .brand-banner-sub { font-size: 13px; opacity: .9; margin-top: 2px; }
@@ -378,9 +378,9 @@ a:hover { text-decoration: underline; }
     cursor: pointer;
     transition: all .15s;
     font-family: inherit;
-    box-shadow: 0 2px 6px rgba(42,127,107,.25);
+    box-shadow: 0 2px 6px rgba(8,145,178,.25);
 }
-.btn:hover { box-shadow: 0 4px 12px rgba(42,127,107,.35); transform: translateY(-1px); text-decoration: none; color: #fff; }
+.btn:hover { box-shadow: 0 4px 12px rgba(8,145,178,.35); transform: translateY(-1px); text-decoration: none; color: #fff; }
 .btn-secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); box-shadow: none; }
 .btn-secondary:hover { background: var(--primary-light); box-shadow: none; transform: none; }
 .btn-danger { background: linear-gradient(135deg, var(--danger), #a91e1e); }
@@ -614,7 +614,7 @@ table.data tbody tr { cursor: pointer; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #2a7f6b 0%, #1d5e4e 100%);
+    background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
 }
 .login-box {
     background: #fff;
@@ -723,7 +723,7 @@ table.data tbody tr { cursor: pointer; }
    ============================================================ */
 
 /* 公众导航：稍微区分一下 */
-.public-nav { background: linear-gradient(135deg, #2a7f6b 0%, #1d5e4e 100%); }
+.public-nav { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); }
 .public-back {
     background: rgba(255,255,255,.2);
     color: #fff;
