@@ -81,7 +81,8 @@ def init_db():
             claimer_gender TEXT,                   -- 认领人性别：男/女
             storage_location TEXT,                 -- 存放位置（如导诊台2号抽屉）
             hidden_photos TEXT,                    -- 隐藏的照片文件名（逗号分隔，公众看不到）
-            source        TEXT                     -- 来源：空=导医登记 / 患者报失=从报失转入
+            source        TEXT,                    -- 来源：空=导医登记 / 患者报失=从报失转入
+            registered_by TEXT                     -- 登记人（操作的导医，自动记录）
         )
     """)
     # 兼容旧库：若表已存在但缺字段，自动补上
@@ -100,6 +101,8 @@ def init_db():
         conn.execute("ALTER TABLE items ADD COLUMN hidden_photos TEXT")
     if "source" not in cols:
         conn.execute("ALTER TABLE items ADD COLUMN source TEXT")
+    if "registered_by" not in cols:
+        conn.execute("ALTER TABLE items ADD COLUMN registered_by TEXT")
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -410,11 +413,11 @@ def reports():
             db.execute(
                 """INSERT INTO items
                    (code, name, category, description, photo, found_location,
-                    found_time, founder, status, created_at, source)
-                   VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失')""",
+                    found_time, founder, status, created_at, source, registered_by)
+                   VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失',?)""",
                 (code, rep["item_name"], rep["item_category"], rep["description"],
                  rep["photo"], rep["lost_location"], rep["lost_time"],
-                 handled_by or "导医", now)
+                 "患者报失", now, handled_by)
             )
             new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
             # 报失标记为已登记，记录关联的物品id
@@ -592,14 +595,15 @@ def register():
 
         code = generate_code(db)
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        registered_by = session.get("staff_name", "")  # 登记人=当前操作导医
         db.execute(
             """INSERT INTO items
                (code, name, category, description, photo, found_location,
-                found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos)
-               VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?)""",
+                found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos, registered_by)
+               VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?,?)""",
             (code, name, category, description, photo_path,
-             found_location or None, found_time or None, founder or None,
-             now, storage_location or None, hidden_photos)
+             found_location or None, found_time or None, founder or registered_by,
+             now, storage_location or None, hidden_photos, registered_by)
         )
         db.commit()
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页
@@ -912,6 +916,22 @@ def api_edit_claim(item_id):
     )
     db.commit()
     return jsonify({"ok": True, "msg": "认领信息已更新。"})
+
+
+@app.route("/api/item/<int:item_id>/founder", methods=["POST"])
+@login_required
+def api_edit_founder(item_id):
+    """修改捡到人（患者报失的固定不可改）。"""
+    db = get_db()
+    item = db.execute("SELECT source FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        return jsonify({"ok": False, "msg": "物品不存在。"})
+    if item["source"] == "患者报失":
+        return jsonify({"ok": False, "msg": "患者报失的捡到人不可修改。"})
+    founder = request.form.get("founder", "").strip()
+    db.execute("UPDATE items SET founder=? WHERE id=?", (founder or None, item_id))
+    db.commit()
+    return jsonify({"ok": True, "msg": "捡到人已更新。"})
 
 
 # ============================================================

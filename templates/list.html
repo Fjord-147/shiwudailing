@@ -52,6 +52,8 @@
                     <th>捡到地点</th>
                     <th>捡到时间</th>
                     <th>状态</th>
+                    <th>捡到人</th>
+                    <th>登记人</th>
                     <th>认领人</th>
                     <th>认领时间</th>
                     <th>操作</th>
@@ -81,7 +83,21 @@
                         {% else %}
                             <span class="tag tag-pending">待认领</span>
                         {% endif %}
+                        {% if it.source == '患者报失' %}
+                            <span class="tag tag-source" style="margin-top:2px;display:inline-block;">🙋 患者报失</span>
+                        {% endif %}
                     </td>
+                    <!-- 捡到人：患者报失固定不可改，否则可点单元格编辑 -->
+                    <td onclick="event.stopPropagation()">
+                        {% if it.source == '患者报失' %}
+                            <span class="tag tag-source">患者报失</span>
+                        {% else %}
+                            <span class="cell-edit" onclick="editFounderCell({{ it.id }}, this)" title="点击修改">
+                                {{ it.founder or '—' }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>{{ it.registered_by or '—' }}</td>
                     <td>{{ it.claimer_name or '—' }}</td>
                     <td>{{ it.claimed_at or '—' }}</td>
                     <td onclick="event.stopPropagation()">
@@ -256,6 +272,37 @@ function handleCardZoom(el){
 function openPhotoZoomMulti(photos, startIdx){ gZoomOpen(photos, startIdx||0); }
 function openPhotoZoom(src){ gZoomOpen([src.replace('/uploads/','')], 0); }
 function closePhotoZoom(){ gZoomClose(); }
+
+/* 表格内联编辑捡到人 */
+function editFounderCell(itemId, cell){
+    var old = cell.textContent.trim();
+    if(old==='—') old='';
+    cell.innerHTML = '<input type="text" class="inline-edit" value="'+escapeHtml(old)+'" placeholder="捡到人">';
+    var inp = cell.querySelector('input');
+    inp.focus(); inp.select();
+    var saved = false;
+    function save(){
+        if(saved) return; saved = true;
+        var v = inp.value.trim();
+        var fd = new URLSearchParams(); fd.append('founder', v);
+        fetch('/api/item/'+itemId+'/founder', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'}, body:fd.toString()})
+            .then(function(r){return r.json();})
+            .then(function(d){
+                if(d.ok){
+                    cell.textContent = v || '—';
+                    toast(d.msg, 'success');
+                }else{
+                    cell.textContent = old || '—';
+                    toast(d.msg||'修改失败','error');
+                }
+            });
+    }
+    inp.onblur = save;
+    inp.onkeydown = function(e){
+        if(e.key==='Enter'){ e.preventDefault(); inp.blur(); }
+        else if(e.key==='Escape'){ saved=true; cell.textContent = old||'—'; }
+    };
+}
 
 /* ===== 认领抽屉（就地认领）===== */
 var _listClaimPhoneConfirmed = false;

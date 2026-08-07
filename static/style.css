@@ -804,6 +804,23 @@ table.data tbody tr { cursor: pointer; }
 .tag-muted { background: #eceff1; color: #607d8b; }
 /* 患者报失来源标记（紫色）*/
 .tag-source { background: #f3e5f5; color: #7b1fa2; border: 1px solid #e1bee7; }
+/* 表格内联可编辑单元格 */
+.cell-edit {
+    cursor: pointer;
+    border-bottom: 1px dashed var(--primary);
+    padding: 2px 0;
+    display: inline-block;
+    min-width: 30px;
+}
+.cell-edit:hover { background: var(--primary-light); border-radius: 3px; }
+.inline-edit {
+    width: 90px;
+    padding: 3px 6px;
+    border: 1px solid var(--primary);
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: inherit;
+}
 
 /* 公众页移动端适配 */
 @media (max-width: 768px) {
