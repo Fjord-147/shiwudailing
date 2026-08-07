@@ -64,13 +64,20 @@
             </div>
         </div>
         {% if r.status == '待查找' %}
-        <form method="post" class="report-actions">
-            <input type="hidden" name="report_id" value="{{ r.id }}">
-            <input type="text" name="note" class="form-control" placeholder="处理备注（选填）">
-            <button type="submit" name="action" value="register" class="btn btn-sm" onclick="return confirm('将此报失登记入失物总表（标记为患者报失），继续吗？')">📥 登记入总表</button>
-            <button type="submit" name="action" value="found" class="btn btn-success btn-sm">✓ 已找到</button>
-            <button type="submit" name="action" value="ignore" class="btn btn-secondary btn-sm">忽略</button>
-        </form>
+        <div class="report-actions">
+            <input type="text" name="note_{{ r.id }}" id="note_{{ r.id }}" class="form-control" placeholder="处理备注（选填）">
+            <form method="post" style="display:inline;">
+                <input type="hidden" name="report_id" value="{{ r.id }}">
+                <input type="hidden" name="note" id="noteHidden_{{ r.id }}">
+                <button type="submit" name="action" value="register" class="btn btn-sm" onclick="document.getElementById('noteHidden_{{ r.id }}').value=document.getElementById('note_{{ r.id }}').value;return confirm('将此报失登记入失物总表（标记为患者报失），继续吗？')">📥 登记入总表</button>
+            </form>
+            <button class="btn btn-success btn-sm" onclick="openReportClaim({{ r.id }}, {{ r|tojson|safe }})">✓ 已找到</button>
+            <form method="post" style="display:inline;">
+                <input type="hidden" name="report_id" value="{{ r.id }}">
+                <input type="hidden" name="note" id="noteHiddenIg_{{ r.id }}">
+                <button type="submit" name="action" value="ignore" class="btn btn-secondary btn-sm" onclick="document.getElementById('noteHiddenIg_{{ r.id }}').value=document.getElementById('note_{{ r.id }}').value;return confirm('确定要忽略这条报失吗？忽略后可在「已忽略」里恢复。')">忽略</button>
+            </form>
+        </div>
         {% else %}
         <form method="post" class="report-actions">
             <input type="hidden" name="report_id" value="{{ r.id }}">
@@ -83,12 +90,86 @@
 {% else %}
 <div class="empty">没有报失记录</div>
 {% endif %}
+
+<!-- 认领抽屉（报失已找到 → 登记入总表+认领）-->
+<div class="drawer-overlay" id="reportClaimDrawer" onclick="if(event.target===this) closeReportClaim()">
+    <div class="drawer" onclick="event.stopPropagation()">
+        <div class="drawer-head">
+            <h2>✓ 已找到 · 认领登记</h2>
+            <button class="drawer-close" onclick="closeReportClaim()">×</button>
+        </div>
+        <div class="drawer-body">
+            <div id="reportClaimDetail"></div>
+            <div id="reportClaimForm"></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block script %}
 <script>
 function showReportPhoto(photo){
     openModal('<div style="text-align:center;"><img src="/uploads/'+photo+'" style="max-width:100%;border-radius:8px;"></div>');
+}
+
+/* 当前时刻 datetime-local 字符串 */
+function nowLocalStr(){
+    var d = new Date();
+    var pad = function(n){ return n<10?'0'+n:n; };
+    return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+
+/* 报失「已找到」→ 弹认领抽屉 */
+function openReportClaim(reportId, rep){
+    var photoHtml = rep.photo
+        ? '<div class="detail-photos"><img class="photo-big" src="/uploads/'+rep.photo+'" style="cursor:zoom-in;" onclick="gZoomOpen([\''+rep.photo+'\'],0)"></div>'
+        : '';
+    document.getElementById('reportClaimDetail').innerHTML =
+        '<div class="detail-panel" style="margin:0 0 16px;">'+
+        '<div><span class="tag tag-source">🙋 患者报失</span> <span class="code">报失#'+rep.id+'</span></div>'+
+        '<div style="font-size:18px;font-weight:600;margin:6px 0;">'+escapeHtml(rep.item_name)+'</div>'+
+        photoHtml+
+        '<div class="detail-grid">'+
+        '<div><span class="k">类别：</span><span class="v">'+escapeHtml(rep.item_category||'—')+'</span></div>'+
+        '<div><span class="k">丢失地点：</span><span class="v">'+escapeHtml(rep.lost_location||'—')+'</span></div>'+
+        '<div><span class="k">报失人：</span><span class="v">'+escapeHtml(rep.owner_name||'—')+' '+escapeHtml(rep.owner_phone||'')+'</span></div>'+
+        '<div style="grid-column:1/-1;"><span class="k">特征：</span><br><span class="v" style="color:#c62828;font-weight:600;">'+escapeHtml(rep.description||'—')+'</span></div>'+
+        '</div></div>';
+    document.getElementById('reportClaimForm').innerHTML =
+        '<form onsubmit="event.preventDefault();submitReportClaim('+reportId+')">'+
+        '<div class="form-row2">'+
+        '<div class="form-group"><label>认领人姓名 <span class="req">*</span></label><input type="text" id="rc_name" class="form-control" value="'+escapeHtml(rep.owner_name||'')+'" required></div>'+
+        '<div class="form-group"><label>认领人电话</label><input type="text" id="rc_phone" class="form-control" value="'+escapeHtml(rep.owner_phone||'')+'"></div>'+
+        '</div>'+
+        '<div class="form-row2">'+
+        '<div class="form-group"><label>人群</label><select id="rc_group" class="form-control"><option value="">请选择</option><option>老人</option><option>小孩</option><option>青年</option><option>中年</option><option>其他</option></select></div>'+
+        '<div class="form-group"><label>性别</label><select id="rc_gender" class="form-control"><option value="">请选择</option><option value="男">男士</option><option value="女">女士</option></select></div>'+
+        '</div>'+
+        '<div class="form-group" style="margin-bottom:14px;"><label>认领时间</label><input type="datetime-local" id="rc_time" class="form-control" value="'+nowLocalStr()+'"></div>'+
+        '<label class="checkbox-row" style="margin:14px 0;"><input type="checkbox" id="rc_verified" value="1"><span>我已核对物品特征无误</span></label>'+
+        '<button type="submit" class="btn btn-success btn-block">✓ 确认已找到并认领</button>'+
+        '</form>';
+    document.getElementById('reportClaimDrawer').classList.add('open');
+}
+function closeReportClaim(){
+    document.getElementById('reportClaimDrawer').classList.remove('open');
+}
+function submitReportClaim(reportId){
+    var fd = new URLSearchParams();
+    fd.append('claimer_name', document.getElementById('rc_name').value.trim());
+    fd.append('claimer_phone', document.getElementById('rc_phone').value.trim());
+    fd.append('claimer_group', document.getElementById('rc_group').value);
+    fd.append('claimer_gender', document.getElementById('rc_gender').value);
+    fd.append('claimed_at', document.getElementById('rc_time').value);
+    if(document.getElementById('rc_verified').checked) fd.append('feature_verified','1');
+    fetch('/api/report/'+reportId+'/found_claim', {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'}, body:fd.toString()})
+        .then(function(r){return r.json();})
+        .then(function(d){
+            if(!d.ok){ toast(d.msg||'操作失败','error'); return; }
+            closeReportClaim();
+            toast(d.msg, 'success');
+            setTimeout(function(){ location.reload(); }, 900);
+        });
 }
 </script>
 {% endblock %}

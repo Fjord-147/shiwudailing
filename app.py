@@ -453,6 +453,7 @@ def reports():
         params += [f"%{q}%"] * 4
     sql += " ORDER BY id DESC"
     all_reports = db.execute(sql, params).fetchall()
+    all_reports = [dict(r) for r in all_reports]  # 转dict供模板tojson
     # 统计各状态数量
     counts = {
         "待查找": db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='待查找'").fetchone()["c"],
@@ -471,6 +472,63 @@ def reports_pending_count():
     db = get_db()
     c = db.execute("SELECT COUNT(*) c FROM lost_reports WHERE status='待查找'").fetchone()["c"]
     return jsonify({"ok": True, "count": c})
+
+
+@app.route("/api/report/<int:report_id>/found_claim", methods=["POST"])
+@login_required
+def report_found_claim(report_id):
+    """报失「已找到」：登记入总表（患者报失）+ 直接认领，一步到位。"""
+    db = get_db()
+    rep = db.execute("SELECT * FROM lost_reports WHERE id=?", (report_id,)).fetchone()
+    if not rep:
+        return jsonify({"ok": False, "msg": "报失记录不存在。"})
+    if rep["status"] != "待查找":
+        return jsonify({"ok": False, "msg": "该报失已处理。"})
+
+    # 认领人信息
+    claimer_name = request.form.get("claimer_name", "").strip()
+    claimer_phone = request.form.get("claimer_phone", "").strip()
+    claimer_group = request.form.get("claimer_group", "").strip()
+    claimer_gender = request.form.get("claimer_gender", "").strip()
+    feature_verified = 1 if request.form.get("feature_verified") else 0
+    operator = session.get("staff_name", "")
+    if not claimer_name:
+        return jsonify({"ok": False, "msg": "请填写认领人姓名。"})
+    if not feature_verified:
+        return jsonify({"ok": False, "msg": "请勾选已核对物品特征。"})
+
+    # 认领时间（可手填）
+    claimed_at_raw = request.form.get("claimed_at", "").strip()
+    if claimed_at_raw:
+        dt = parse_dt(claimed_at_raw.replace("T", " "))
+        now = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    else:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # 生成物品（患者报失 + 直接已认领）
+    code = generate_code(db)
+    db.execute(
+        """INSERT INTO items
+           (code, name, category, description, photo, found_location,
+            found_time, founder, status, created_at, source, registered_by,
+            claimer_name, claimer_phone, claimer_group, claimer_gender,
+            feature_verified, claimed_at, operator)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (code, rep["item_name"], rep["item_category"], rep["description"],
+         rep["photo"], rep["lost_location"], rep["lost_time"], "患者报失",
+         "已认领", now, "患者报失", operator,
+         claimer_name, claimer_phone or None, claimer_group or None,
+         claimer_gender or None, 1, now, operator)
+    )
+    new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
+    # 报失标记已找到
+    db.execute(
+        """UPDATE lost_reports SET status='已找到', handled_by=?, handled_at=?,
+           matched_item_id=?, note=? WHERE id=?""",
+        (operator, now, new_item_id, f"已找到并认领，编号{code}", report_id)
+    )
+    db.commit()
+    return jsonify({"ok": True, "msg": f"已找到并认领完成，编号 {code}（患者报失）。"})
 
 
 # ============================================================
