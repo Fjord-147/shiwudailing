@@ -1,14 +1,15 @@
 /* ===== 全局 ===== */
 * { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-    --primary: #2E7D9B;
-    --primary-dark: #1f5d75;
-    --primary-light: #e8f4f8;
+    --primary: #2a7f6b;        /* 青绿，中医草本感 */
+    --primary-dark: #1d5e4e;   /* 深青绿 */
+    --primary-light: #e8f5f0;  /* 浅青绿底 */
+    --accent: #c8a45c;         /* 古铜金，点缀高亮 */
     --danger: #c62828;
     --success: #2e7d32;
     --warn: #f57c00;
     --gray: #6b7280;
-    --light: #f5f7fa;
+    --light: #f7f9f8;          /* 柔和底色 */
     --border: #e2e8f0;
 }
 body {
@@ -20,6 +21,14 @@ body {
     line-height: 1.6;
 }
 a { color: var(--primary); text-decoration: none; }
+a:hover { color: var(--primary-dark); }
+/* 选中文本青绿色 */
+::selection { background: var(--primary-light); color: var(--primary-dark); }
+/* 美化滚动条 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #c8d8d2; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--primary); }
+::-webkit-scrollbar-track { background: transparent; }
 a:hover { text-decoration: underline; }
 
 /* ===== 顶部导航 ===== */
@@ -293,15 +302,47 @@ a:hover { text-decoration: underline; }
 /* ===== 卡片 ===== */
 .card {
     background: #fff;
-    border-radius: 10px;
+    border-radius: 12px;
     padding: 20px 24px;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,.05);
     margin-bottom: 20px;
     border: 1px solid var(--border);
 }
-.card h2 { font-size: 17px; margin-bottom: 14px; color: var(--primary-dark); }
+.card h2 { font-size: 17px; margin-bottom: 14px; color: var(--primary-dark); display:flex; align-items:center; gap:6px; }
 
 /* ===== 统计数字卡片 ===== */
+/* 品牌横幅（工作台顶部）*/
+.brand-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: #fff;
+    padding: 18px 24px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 14px rgba(42,127,107,.25);
+}
+.brand-banner-title { font-size: 20px; font-weight: 700; }
+.brand-banner-sub { font-size: 13px; opacity: .9; margin-top: 2px; }
+.brand-banner-date { font-size: 14px; opacity: .85; }
+
+/* 侧边栏品牌区（医院全称+图标）*/
+.sidebar-brand {
+    text-align: center;
+    padding: 18px 12px;
+    border-bottom: 1px solid rgba(255,255,255,.15);
+    background: rgba(0,0,0,.12);
+}
+.sidebar-brand .brand-logo { font-size: 30px; }
+.sidebar-brand .brand-name {
+    font-size: 15px; font-weight: 700; color: #fff;
+    margin-top: 6px; line-height: 1.3;
+}
+.sidebar-brand .brand-sub {
+    font-size: 11px; color: var(--accent); margin-top: 3px;
+}
+
 .stat-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -310,15 +351,17 @@ a:hover { text-decoration: underline; }
 }
 .stat-card {
     background: #fff;
-    border-radius: 10px;
-    padding: 24px;
+    border-radius: 12px;
+    padding: 22px;
     text-align: center;
-    box-shadow: 0 1px 3px rgba(0,0,0,.06);
-    border-top: 4px solid var(--primary);
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    border-left: 4px solid var(--primary);
+    transition: transform .15s, box-shadow .15s;
 }
-.stat-card.warn { border-top-color: var(--warn); }
-.stat-card.success { border-top-color: var(--success); }
-.stat-card .num { font-size: 36px; font-weight: 700; color: var(--primary-dark); }
+.stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,.1); }
+.stat-card.warn { border-left-color: var(--warn); }
+.stat-card.success { border-left-color: var(--success); }
+.stat-card .num { font-size: 34px; font-weight: 700; color: var(--primary-dark); font-variant-numeric: tabular-nums; }
 .stat-card.warn .num { color: var(--warn); }
 .stat-card.success .num { color: var(--success); }
 .stat-card .label { color: var(--gray); font-size: 14px; margin-top: 4px; }
@@ -329,20 +372,21 @@ a:hover { text-decoration: underline; }
     padding: 9px 20px;
     border-radius: 6px;
     border: none;
-    background: var(--primary);
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
     color: #fff;
     font-size: 15px;
     cursor: pointer;
-    transition: background .15s;
+    transition: all .15s;
     font-family: inherit;
+    box-shadow: 0 2px 6px rgba(42,127,107,.25);
 }
-.btn:hover { background: var(--primary-dark); text-decoration: none; color: #fff; }
-.btn-secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
-.btn-secondary:hover { background: var(--primary-light); }
-.btn-danger { background: var(--danger); }
-.btn-danger:hover { background: #a91e1e; }
-.btn-success { background: var(--success); }
-.btn-success:hover { background: #256528; }
+.btn:hover { box-shadow: 0 4px 12px rgba(42,127,107,.35); transform: translateY(-1px); text-decoration: none; color: #fff; }
+.btn-secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); box-shadow: none; }
+.btn-secondary:hover { background: var(--primary-light); box-shadow: none; transform: none; }
+.btn-danger { background: linear-gradient(135deg, var(--danger), #a91e1e); }
+.btn-danger:hover { box-shadow: 0 4px 12px rgba(198,40,40,.35); }
+.btn-success { background: linear-gradient(135deg, var(--success), #256528); }
+.btn-success:hover { box-shadow: 0 4px 12px rgba(46,125,50,.35); }
 .btn-sm { padding: 5px 12px; font-size: 13px; }
 .btn-block { display: block; width: 100%; text-align: center; }
 .btn-row { display: flex; gap: 10px; margin-top: 16px; }
@@ -570,7 +614,7 @@ table.data tbody tr { cursor: pointer; }
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #2E7D9B 0%, #1f5d75 100%);
+    background: linear-gradient(135deg, #2a7f6b 0%, #1d5e4e 100%);
 }
 .login-box {
     background: #fff;
@@ -679,7 +723,7 @@ table.data tbody tr { cursor: pointer; }
    ============================================================ */
 
 /* 公众导航：稍微区分一下 */
-.public-nav { background: linear-gradient(135deg, #2E7D9B 0%, #1f5d75 100%); }
+.public-nav { background: linear-gradient(135deg, #2a7f6b 0%, #1d5e4e 100%); }
 .public-back {
     background: rgba(255,255,255,.2);
     color: #fff;
@@ -744,8 +788,8 @@ table.data tbody tr { cursor: pointer; }
     text-decoration: none;
 }
 .entry-find {
-    background: linear-gradient(135deg, #e8f4f8, #d1ecf3);
-    border-color: #b3d4e0;
+    background: linear-gradient(135deg, var(--primary-light), #d4ebe4);
+    border-color: #a8d4c8;
 }
 .entry-report {
     background: linear-gradient(135deg, #fff3e0, #ffe0b2);
@@ -753,7 +797,7 @@ table.data tbody tr { cursor: pointer; }
 }
 .entry-icon { font-size: 36px; flex-shrink: 0; }
 .entry-title { font-size: 17px; font-weight: 700; margin-bottom: 2px; }
-.entry-find .entry-title { color: #1f5d75; }
+.entry-find .entry-title { color: var(--primary-dark); }
 .entry-report .entry-title { color: #e65100; }
 .entry-desc { font-size: 13px; color: #6b7280; }
 

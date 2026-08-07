@@ -1,8 +1,17 @@
 {% extends "base.html" %}
 {% block title %}工作台 - 和康失物招领{% endblock %}
 {% block content %}
+<!-- 品牌横幅 -->
+<div class="brand-banner">
+    <div class="brand-banner-left">
+        <div class="brand-banner-title">🏥 苏州和康中医医院</div>
+        <div class="brand-banner-sub">失物招领管理系统 · {{ current_user }}，欢迎您</div>
+    </div>
+    <div class="brand-banner-date">{{ now_date }}</div>
+</div>
+
 <h1 class="page-title">工作台</h1>
-<p class="page-subtitle">您好 {{ current_user }}，这里是失物招领管理总览</p>
+<p class="page-subtitle">失物招领管理总览</p>
 
 {% if pending_reports > 0 %}
 <a href="{{ url_for('reports') }}" class="flash success" style="text-decoration:none;display:block;margin-bottom:20px;">

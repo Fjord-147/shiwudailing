@@ -297,6 +297,7 @@ def index():
                            month_returned=month_returned,
                            pending_reports=pending_reports,
                            pending_items=pending_items,
+                           now_date=datetime.now().strftime("%Y年%m月%d日"),
                            default_time=datetime.now().strftime("%Y-%m-%dT%H:%M"))
 
 
