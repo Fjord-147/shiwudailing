@@ -161,14 +161,16 @@ def inject_globals():
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
+        username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
-        staff_name = request.form.get("staff_name", "").strip()
-        if password == config.ACCESS_PASSWORD and staff_name:
+        user = config.USERS.get(username)
+        if user and password == user["password"]:
             session["logged_in"] = True
-            session["staff_name"] = staff_name
+            session["staff_name"] = user["name"]  # 存真名（如"刘敏"）
+            session["username"] = username
             nxt = session.pop("next_url", None)
             return redirect(nxt or url_for("index"))
-        flash("口令错误或未填写姓名，请重试。", "error")
+        flash("账号或密码错误，请重试。", "error")
     return render_template("login.html")
 
 

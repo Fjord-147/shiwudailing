@@ -18,13 +18,18 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 PORT = int(os.environ.get("PORT", 8000))
 HOST = "0.0.0.0"  # 0.0.0.0 表示允许其他电脑连进来，不要改成 127.0.0.1
 
-# ============ 统一进入口令 ============
-# 优先读环境变量 LF_PASSWORD（云端部署用），本地没设则用默认值。
-# 注意：部署到服务器/传到 GitHub 时，务必通过环境变量设置，不要用默认口令。
+# ============ 统一进入口令（已废弃，保留兼容）============
 ACCESS_PASSWORD = os.environ.get("LF_PASSWORD", "8888")
 
 # Flask session 加密用。优先读环境变量 LF_SECRET_KEY，务必改成你自己的随机串。
 SECRET_KEY = os.environ.get("LF_SECRET_KEY", "clinic-lost-found-2026-change-me")
+
+# ============ 管理员账号（账号密码登录）============
+# 格式："账号名": {"password": "密码", "name": "显示真名"}
+# 以后加护士：复制一行，改账号密码和真名即可
+USERS = {
+    "liumin": {"password": "liumin123", "name": "刘敏"},
+}
 
 # ============ 物品类别（下拉选项）============
 CATEGORIES = [
