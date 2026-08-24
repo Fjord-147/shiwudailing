@@ -40,10 +40,14 @@
     {% for it in items %}
     <div class="goods-card blind-card">
         <div class="goods-photo">
-            <div class="goods-photo-placeholder">{{ it.icon }}</div>
+            {% if it.has_photo %}
+                <img src="{{ url_for('public_photo', item_id=it.id) }}" alt="物品照片（马赛克）">
+            {% else %}
+                <div class="goods-photo-placeholder">{{ it.icon }}</div>
+            {% endif %}
         </div>
         <div class="goods-info">
-            <div class="goods-name">{{ it.category }}</div>
+            <div class="goods-name">{{ it.safe_name }}</div>
             <div class="goods-meta"><span class="tag tag-pending">待认领</span></div>
             <div class="goods-time">{{ it.rough }}捡到</div>
         </div>
@@ -51,8 +55,8 @@
     {% endfor %}
 </div>
 <div class="blind-note">
-    🔒 为防止冒领，物品名称、特征、照片等信息已隐藏。<br>
-    请凭本人记忆到<strong>导医台</strong>描述物品特征，核对无误后认领。
+    🔒 为防止冒领，照片已做马赛克处理，名称已隐去颜色等细节。<br>
+    如认为是您的物品，请到<strong>导医台</strong>描述特征核对认领。
 </div>
 {% else %}
 <div class="empty public-empty">

@@ -278,6 +278,25 @@ def rough_date(s):
     return f"{mo}月{xun}旬"
 
 
+# 名称里要自动去掉的特征词（颜色/成色等——这些是核对答案，公众端不能见）
+# 注意只用双字词组，避免误伤（如单字"红"会把"口红"删坏）
+NAME_STRIP_WORDS = [
+    "黑色", "白色", "红色", "蓝色", "绿色", "黄色", "灰色", "粉色", "紫色",
+    "棕色", "橙色", "银色", "金色", "褐色", "深色", "浅色", "花色", "彩色", "黑白",
+    "透明", "全新", "新款", "旧款", "破旧", "一只", "一个", "一张", "一把", "一部",
+]
+
+
+def sanitize_name(name, category):
+    """公众端名称脱敏：去掉颜色等特征词，只留品类。
+    例：'白色帽子'→'帽子'；删空了则退回类别。"""
+    s = (name or "").strip()
+    for w in NAME_STRIP_WORDS:
+        s = s.replace(w, "")
+    s = s.strip(" -_/、，,。.")
+    return s or (category or "物品")
+
+
 # ============================================================
 # 路由：管理员工作台（原首页，移到 /admin）
 # ============================================================
@@ -321,12 +340,13 @@ def index():
 # ============================================================
 @app.route("/")
 def public_index():
-    """公众首页（全盲模式）：只显示 类别+图标+大概日期，其余全部隐藏。
-    名称/特征/地点/时间/编号/照片均不出现在公众端，防冒领。"""
+    """公众首页（智能半盲）：显示 马赛克照片+脱敏名称+大概日期。
+    名称自动去颜色等特征词，照片只给马赛克版，防冒领。"""
     db = get_db()
     cat = request.args.get("category", "").strip()
 
-    sql = "SELECT id, category, found_time, created_at FROM items WHERE status='待认领'"
+    sql = ("SELECT id, name, category, photo, hidden_photos, found_time, created_at "
+           "FROM items WHERE status='待认领'")
     params = []
     if cat:
         sql += " AND category=?"
@@ -335,11 +355,16 @@ def public_index():
     rows = db.execute(sql, params).fetchall()
     items = []
     for r in rows:
+        all_photos = [p.strip() for p in (r["photo"] or "").split(",") if p.strip()]
+        hidden = set(p.strip() for p in (r["hidden_photos"] or "").split(",") if p.strip())
+        has_photo = any(p not in hidden for p in all_photos)
         items.append({
             "id": r["id"],
+            "safe_name": sanitize_name(r["name"], r["category"]),
             "category": r["category"] or "其他",
             "icon": config.CATEGORY_ICONS.get(r["category"], "📦"),
             "rough": rough_date(r["found_time"] or r["created_at"]),
+            "has_photo": has_photo,
         })
     return render_template("public_index.html", items=items, cat=cat)
 
@@ -568,16 +593,17 @@ def public_photo(item_id):
 
 @app.route("/public/item/<int:item_id>")
 def public_item(item_id):
-    """公众版物品详情（全盲模式）：只返回类别+大概日期，防冒领。"""
+    """公众版物品详情（智能半盲）：脱敏名称+类别+大概日期，防冒领。"""
     db = get_db()
     row = db.execute(
-        "SELECT id, category, found_time, created_at, status FROM items WHERE id=?",
+        "SELECT id, name, category, found_time, created_at, status FROM items WHERE id=?",
         (item_id,)
     ).fetchone()
     if not row:
         return jsonify({"ok": False}), 404
     return jsonify({"ok": True, "item": {
         "id": row["id"],
+        "safe_name": sanitize_name(row["name"], row["category"]),
         "category": row["category"] or "其他",
         "rough": rough_date(row["found_time"] or row["created_at"]),
         "status": row["status"],
@@ -586,8 +612,38 @@ def public_item(item_id):
 
 @app.route("/public/photo/<int:item_id>/<int:idx>")
 def public_photo_idx(item_id, idx):
-    """公众照片接口（全盲模式下已停用）：一律返回占位图。"""
-    return _placeholder_img()
+    """公众照片：只给马赛克版（缩放+模糊，看得出是什么、看不清细节）。
+    单张🔒隐藏的照片连马赛克都不给。"""
+    db = get_db()
+    row = db.execute("SELECT photo, hidden_photos FROM items WHERE id=?", (item_id,)).fetchone()
+    if not row:
+        return _placeholder_img()
+    all_photos = [p.strip() for p in (row["photo"] or "").split(",") if p.strip()]
+    hidden = set(p.strip() for p in (row["hidden_photos"] or "").split(",") if p.strip())
+    public_list = [p for p in all_photos if p not in hidden]
+    if idx < 0 or idx >= len(public_list):
+        return _placeholder_img()
+    return get_blur_photo(public_list[idx])
+
+
+def get_blur_photo(filename):
+    """生成并返回照片的马赛克版（缓存到 uploads/blur/），生成失败给占位图。
+    原图仅管理端 /uploads 可见（需登录）。"""
+    blur_dir = os.path.join(config.UPLOAD_FOLDER, "blur")
+    os.makedirs(blur_dir, exist_ok=True)
+    base = os.path.splitext(os.path.basename(filename))[0]
+    dst = os.path.join(blur_dir, base + ".jpg")
+    if not os.path.exists(dst):
+        try:
+            from PIL import Image, ImageFilter
+            img = Image.open(os.path.join(config.UPLOAD_FOLDER, filename)).convert("RGB")
+            # 先缩小再放大 = 马赛克；加高斯模糊更保险
+            small = img.resize((max(1, img.width // 14), max(1, img.height // 14)))
+            small = small.filter(ImageFilter.GaussianBlur(1.5))
+            small.resize(img.size).save(dst, "JPEG", quality=65)
+        except Exception:
+            return _placeholder_img()
+    return send_from_directory(blur_dir, base + ".jpg")
 
 
 def _placeholder_img():

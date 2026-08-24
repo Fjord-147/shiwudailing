@@ -2,3 +2,5 @@ flask==2.3.3
 openpyxl==3.1.2
 # gunicorn 用于生产部署（阿里云/Linux），本地开发不需要启动它
 gunicorn==21.2.0
+# Pillow 用于公众端照片马赛克处理
+pillow==10.4.0
