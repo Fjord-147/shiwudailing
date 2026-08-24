@@ -643,7 +643,9 @@ def get_blur_photo(filename):
             small.resize(img.size).save(dst, "JPEG", quality=65)
         except Exception:
             return _placeholder_img()
-    return send_from_directory(blur_dir, base + ".jpg")
+    resp = send_from_directory(blur_dir, base + ".jpg")
+    resp.headers["Cache-Control"] = "no-cache"  # 防浏览器缓存旧清晰图
+    return resp
 
 
 def _placeholder_img():

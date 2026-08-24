@@ -41,7 +41,7 @@
     <div class="goods-card blind-card">
         <div class="goods-photo">
             {% if it.has_photo %}
-                <img src="{{ url_for('public_photo', item_id=it.id) }}" alt="物品照片（马赛克）">
+                <img src="{{ url_for('public_photo', item_id=it.id) }}?v=mosaic2" alt="物品照片（马赛克）">
             {% else %}
                 <div class="goods-photo-placeholder">{{ it.icon }}</div>
             {% endif %}
