@@ -46,7 +46,8 @@
                     <td>{{ it.claimed_at or '—' }}</td>
                     <td>{{ it.operator or '—' }}</td>
                     <td>
-                        <button class="btn btn-secondary btn-sm" onclick="editClaimById({{ it.id }})">✎ 修改</button>
+                        <button class="btn btn-secondary btn-sm" onclick="editItem({{ it.id }})" title="编辑物品信息">✏ 物品</button>
+                        <button class="btn btn-secondary btn-sm" onclick="editClaimById({{ it.id }})">✎ 认领</button>
                         <button class="btn btn-sm btn-danger-outline" onclick="doUnclaim({{ it.id }}, '{{ it.code }}')">↩ 撤销</button>
                         <button class="btn btn-sm btn-danger-outline" onclick="doDelete({{ it.id }}, '{{ it.code }}', '{{ it.name|replace("'", "&#39;") }}')">🗑 删除</button>
                     </td>

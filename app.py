@@ -265,6 +265,19 @@ def norm_date(s):
     return s.strip()  # 解析不了就原样返回
 
 
+def rough_date(s):
+    """把时间模糊成'8月下旬'级别（患者端全盲用，只给大概时间）。"""
+    import re as _re
+    if not s:
+        return ""
+    m = _re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", str(s))
+    if not m:
+        return ""
+    mo, d = int(m.group(2)), int(m.group(3))
+    xun = "上" if d <= 10 else ("中" if d <= 20 else "下")
+    return f"{mo}月{xun}旬"
+
+
 # ============================================================
 # 路由：管理员工作台（原首页，移到 /admin）
 # ============================================================
@@ -308,29 +321,27 @@ def index():
 # ============================================================
 @app.route("/")
 def public_index():
+    """公众首页（全盲模式）：只显示 类别+图标+大概日期，其余全部隐藏。
+    名称/特征/地点/时间/编号/照片均不出现在公众端，防冒领。"""
     db = get_db()
-    q = request.args.get("q", "").strip()
     cat = request.args.get("category", "").strip()
 
-    sql = "SELECT * FROM items WHERE status='待认领'"
+    sql = "SELECT id, category, found_time, created_at FROM items WHERE status='待认领'"
     params = []
-    if q:
-        sql += " AND (code LIKE ? OR name LIKE ? OR description LIKE ? OR found_location LIKE ?)"
-        params += [f"%{q}%"] * 4
     if cat:
         sql += " AND category=?"
         params.append(cat)
     sql += " ORDER BY id DESC"
     rows = db.execute(sql, params).fetchall()
-    # 算出每条是否有"非隐藏照片"供模板判断
     items = []
     for r in rows:
-        d = dict(r)
-        all_photos = [p.strip() for p in (d.get("photo") or "").split(",") if p.strip()]
-        hidden = set(p.strip() for p in (d.get("hidden_photos") or "").split(",") if p.strip())
-        d["has_public_photo"] = any(p not in hidden for p in all_photos)
-        items.append(d)
-    return render_template("public_index.html", items=items, q=q, cat=cat)
+        items.append({
+            "id": r["id"],
+            "category": r["category"] or "其他",
+            "icon": config.CATEGORY_ICONS.get(r["category"], "📦"),
+            "rough": rough_date(r["found_time"] or r["created_at"]),
+        })
+    return render_template("public_index.html", items=items, cat=cat)
 
 
 # ============================================================
@@ -557,39 +568,26 @@ def public_photo(item_id):
 
 @app.route("/public/item/<int:item_id>")
 def public_item(item_id):
-    """公众版物品详情：只返回非隐私字段，照片过滤掉隐藏的。"""
+    """公众版物品详情（全盲模式）：只返回类别+大概日期，防冒领。"""
     db = get_db()
     row = db.execute(
-        "SELECT id, code, name, category, description, found_location, "
-        "found_time, photo, hidden_photos, status FROM items WHERE id=?",
+        "SELECT id, category, found_time, created_at, status FROM items WHERE id=?",
         (item_id,)
     ).fetchone()
     if not row:
         return jsonify({"ok": False}), 404
-    d = dict(row)
-    # 过滤掉隐藏的照片，只把可公开的照片列表给前端
-    all_photos = [p.strip() for p in (d.get("photo") or "").split(",") if p.strip()]
-    hidden = set(p.strip() for p in (d.get("hidden_photos") or "").split(",") if p.strip())
-    public_photos = [p for p in all_photos if p not in hidden]
-    d["photos"] = public_photos   # 公众可见的照片列表
-    d["photo"] = public_photos[0] if public_photos else None  # 兼容旧前端取首张
-    d.pop("hidden_photos", None)  # 不暴露隐藏信息
-    return jsonify({"ok": True, "item": d})
+    return jsonify({"ok": True, "item": {
+        "id": row["id"],
+        "category": row["category"] or "其他",
+        "rough": rough_date(row["found_time"] or row["created_at"]),
+        "status": row["status"],
+    }})
 
 
 @app.route("/public/photo/<int:item_id>/<int:idx>")
 def public_photo_idx(item_id, idx):
-    """公众访问某张照片：按序号取该物品的非隐藏照片，越界或隐藏返回占位图。"""
-    db = get_db()
-    row = db.execute("SELECT photo, hidden_photos FROM items WHERE id=?", (item_id,)).fetchone()
-    if not row:
-        return _placeholder_img()
-    all_photos = [p.strip() for p in (row["photo"] or "").split(",") if p.strip()]
-    hidden = set(p.strip() for p in (row["hidden_photos"] or "").split(",") if p.strip())
-    public_photos = [p for p in all_photos if p not in hidden]
-    if idx < 0 or idx >= len(public_photos):
-        return _placeholder_img()
-    return send_from_directory(config.UPLOAD_FOLDER, public_photos[idx])
+    """公众照片接口（全盲模式下已停用）：一律返回占位图。"""
+    return _placeholder_img()
 
 
 def _placeholder_img():
@@ -1006,6 +1004,36 @@ def api_edit_founder(item_id):
     db.execute("UPDATE items SET founder=? WHERE id=?", (founder or None, item_id))
     db.commit()
     return jsonify({"ok": True, "msg": "捡到人已更新。"})
+
+
+@app.route("/api/item/<int:item_id>/edit", methods=["POST"])
+@login_required
+def api_edit_item(item_id):
+    """编辑物品基本信息：名称/类别/特征/地点/时间/存放位置/捡到人。
+    编号和照片不变；患者报失的捡到人固定不可改。"""
+    db = get_db()
+    item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    if not item:
+        return jsonify({"ok": False, "msg": "物品不存在。"})
+    name = request.form.get("name", "").strip()
+    if not name:
+        return jsonify({"ok": False, "msg": "物品名称不能为空。"})
+    category = request.form.get("category", "").strip()
+    description = request.form.get("description", "").strip()
+    found_location = request.form.get("found_location", "").strip()
+    found_time = request.form.get("found_time", "").strip()
+    storage_location = request.form.get("storage_location", "").strip()
+    founder = request.form.get("founder", "").strip()
+    if item["source"] == "患者报失":
+        founder = "患者报失"  # 患者报失的固定不变
+    db.execute(
+        """UPDATE items SET name=?, category=?, description=?, found_location=?,
+           found_time=?, storage_location=?, founder=? WHERE id=?""",
+        (name, category or None, description or None, found_location or None,
+         found_time or None, storage_location or None, founder or None, item_id)
+    )
+    db.commit()
+    return jsonify({"ok": True, "msg": f"物品信息已更新（{item['code']}）。"})
 
 
 # ============================================================

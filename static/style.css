@@ -801,6 +801,21 @@ table.data tbody tr { cursor: pointer; }
 .entry-report .entry-title { color: #e65100; }
 .entry-desc { font-size: 13px; color: #6b7280; }
 
+/* 患者端全盲卡片 */
+.blind-card { cursor: default; }
+.blind-card .goods-photo-placeholder { font-size: 44px; }
+.blind-note {
+    text-align: center;
+    color: #6b7280;
+    font-size: 13px;
+    line-height: 1.8;
+    background: var(--primary-light);
+    border: 1px dashed var(--primary);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 18px;
+}
+
 /* 公众页工具栏 */
 .public-toolbar {
     display: flex;

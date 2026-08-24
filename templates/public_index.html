@@ -1,10 +1,10 @@
 {% extends "base_public.html" %}
-{% block title %}失物招领 - 和康中医医院{% endblock %}
+{% block title %}失物招领 - 苏州和康中医医院{% endblock %}
 {% block content %}
 
 <div class="public-hero">
     <h1>失物招领</h1>
-    <p>和康中医医院捡到的物品在此展示，看到您丢失的请到<strong>导医台</strong>核对认领</p>
+    <p>门诊捡到的物品由导医台统一保管。为保护失主隐私，<strong>物品详细信息已隐藏</strong>，如您丢失了物品，请到导医台核对认领。</p>
 </div>
 
 <!-- 两个显眼大入口：找东西 / 报失 -->
@@ -19,24 +19,18 @@
     <a href="{{ url_for('public_report') }}" class="entry-card entry-report">
         <div class="entry-icon">📝</div>
         <div class="entry-text">
-            <div class="entry-title">我捡到东西 / 没找到</div>
+            <div class="entry-title">没找到 / 我捡到东西</div>
             <div class="entry-desc">登记报失，等通知</div>
         </div>
     </a>
 </div>
 
-<!-- 搜索 + 类别筛选 -->
-<form method="get" class="public-toolbar" id="itemList">
-    <input type="text" name="q" class="form-control" placeholder="搜索物品名称、特征、地点..."
-           value="{{ q }}">
-    <button type="submit" class="btn btn-secondary btn-sm">🔍 搜索</button>
-    <a href="{{ url_for('public_index') }}" class="btn btn-secondary btn-sm">全部</a>
-</form>
-
-<div class="filter-tabs">
-    <a href="{{ url_for('public_index', q=q) }}" class="filter-tab {% if not cat %}active{% endif %}">全部</a>
+<!-- 类别筛选 -->
+<div class="filter-tabs" id="itemList">
+    <a href="{{ url_for('public_index') }}"
+       class="filter-tab {% if not cat %}active{% endif %}">全部</a>
     {% for c in categories %}
-    <a href="{{ url_for('public_index', category=c, q=q) }}"
+    <a href="{{ url_for('public_index', category=c) }}"
        class="filter-tab {% if cat == c %}active{% endif %}">{{ c }}</a>
     {% endfor %}
 </div>
@@ -44,24 +38,21 @@
 {% if items %}
 <div class="card-grid">
     {% for it in items %}
-    <div class="goods-card" onclick="showPublicDetail({{ it.id }})">
+    <div class="goods-card blind-card">
         <div class="goods-photo">
-            {% if it.has_public_photo %}
-                <img src="{{ url_for('public_photo', item_id=it.id) }}">
-            {% else %}
-                <div class="goods-photo-placeholder">📦</div>
-            {% endif %}
+            <div class="goods-photo-placeholder">{{ it.icon }}</div>
         </div>
         <div class="goods-info">
-            <div class="goods-name">{{ it.name }}</div>
-            <div class="goods-meta">
-                <span class="tag tag-pending">{{ it.category or '未分类' }}</span>
-                <span class="goods-loc">📍 {{ it.found_location or '门诊' }}</span>
-            </div>
-            <div class="goods-time">捡到时间：{{ it.found_time or it.created_at[:10] }}</div>
+            <div class="goods-name">{{ it.category }}</div>
+            <div class="goods-meta"><span class="tag tag-pending">待认领</span></div>
+            <div class="goods-time">{{ it.rough }}捡到</div>
         </div>
     </div>
     {% endfor %}
+</div>
+<div class="blind-note">
+    🔒 为防止冒领，物品名称、特征、照片等信息已隐藏。<br>
+    请凭本人记忆到<strong>导医台</strong>描述物品特征，核对无误后认领。
 </div>
 {% else %}
 <div class="empty public-empty">
@@ -70,46 +61,4 @@
     <p style="font-size:13px;margin-top:8px;">如果您丢了东西，可以<a href="{{ url_for('public_report') }}">在这里报失</a>，我们会留意</p>
 </div>
 {% endif %}
-
-{% endblock %}
-
-{% block script %}
-<script>
-/* 公众详情弹窗：走公开接口 /public/item，不暴露认领人隐私 */
-function showPublicDetail(itemId) {
-    fetch("/public/item/" + itemId).then(function(r){return r.json();})
-        .then(function(data){
-            if(!data.ok){toast("读取失败","error");return;}
-            var it = data.item;
-            // 后端返回 photos 数组（已过滤隐藏的照片）
-            var photos = it.photos || [];
-            var photoHtml;
-            if(photos.length > 0){
-                photoHtml = '<div class="detail-photos">' + photos.map(function(p, i){
-                    return '<img class="photo-big" src="/public/photo/'+it.id+'/'+i+'">';
-                }).join('') + '</div>';
-            } else {
-                photoHtml = '<div style="color:#999;margin:10px 0;">（未提供照片，请到导医台查看实物）</div>';
-            }
-            var html =
-                '<div class="detail-panel" style="margin:0;">' +
-                '<div><span class="code" style="color:#666;font-size:13px;">编号 ' + it.code + '</span>' +
-                '<span class="tag tag-pending" style="margin-left:8px;">待认领</span></div>' +
-                '<div style="font-size:20px;font-weight:600;margin:6px 0;">' + it.name + '</div>' +
-                photoHtml +
-                '<div class="detail-grid">' +
-                '<div><span class="k">类别：</span><span class="v">' + (it.category||'—') + '</span></div>' +
-                '<div><span class="k">捡到地点：</span><span class="v">' + (it.found_location||'—') + '</span></div>' +
-                '<div><span class="k">捡到时间：</span><span class="v">' + (it.found_time||'—') + '</span></div>' +
-                '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">' +
-                (it.description||'—') + '</span></div>' +
-                '</div>' +
-                '<div style="margin-top:16px;padding:12px;background:#fff8e1;border-radius:6px;font-size:14px;color:#8d6e00;">' +
-                '👆 如果这是您丢失的物品，请到<strong>门诊导医台</strong>，报上失物编号，当面核对认领。' +
-                '</div>' +
-                '</div>';
-            openModal(html);
-        });
-}
-</script>
 {% endblock %}

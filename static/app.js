@@ -378,6 +378,69 @@ function editClaimById(itemId){
         .then(function(d){ if(d.ok) doEditClaim(d.item); else toast('读取失败','error'); });
 }
 
+/* ===== 编辑物品基本信息（编号/照片不变）===== */
+var ITEM_CATEGORIES = ["证件","钥匙","手机/电子产品","钱包","衣物","病历/检查单","水杯/雨伞","其他"];
+function editItem(itemId){
+    fetch('/api/item/'+itemId).then(function(r){return r.json();})
+        .then(function(d){
+            if(!d.ok){ toast('读取失败','error'); return; }
+            var it = d.item;
+            var ft = (it.found_time||'').replace(' ','T');
+            var founderField = (it.source==='患者报失')
+                ? '<input type="text" class="form-control" value="患者报失" disabled>'
+                  +'<input type="hidden" id="ei_founder" value="患者报失">'
+                : '<input type="text" id="ei_founder" class="form-control" value="'+escapeHtml(it.founder||'')+'">';
+            var catOpts = ITEM_CATEGORIES.map(function(c){
+                return '<option value="'+c+'"'+(it.category===c?' selected':'')+'>'+c+'</option>';
+            }).join('');
+            var html =
+                '<form onsubmit="event.preventDefault();submitEditItem('+itemId+')">'+
+                '<div style="font-size:18px;font-weight:600;margin-bottom:4px;">编辑物品信息</div>'+
+                '<div style="color:#6b7280;font-size:13px;margin-bottom:16px;">编号 '+escapeHtml(it.code)+'（编号和照片不变）</div>'+
+                '<div class="form-group" style="margin-bottom:14px;"><label>物品名称 <span class="req">*</span></label>'+
+                '<input type="text" id="ei_name" class="form-control" value="'+escapeHtml(it.name||'')+'" required></div>'+
+                '<div class="form-row2">'+
+                '<div class="form-group"><label>类别</label><select id="ei_category" class="form-control">'+catOpts+'</select></div>'+
+                '<div class="form-group"><label>捡到地点</label><input type="text" id="ei_location" class="form-control" value="'+escapeHtml(it.found_location||'')+'"></div>'+
+                '</div>'+
+                '<div class="form-group" style="margin-bottom:14px;"><label>特征描述（仅管理端可见）</label>'+
+                '<textarea id="ei_desc" class="form-control">'+escapeHtml(it.description||'')+'</textarea></div>'+
+                '<div class="form-row2">'+
+                '<div class="form-group"><label>捡到时间</label><input type="datetime-local" id="ei_time" class="form-control" value="'+ft+'"></div>'+
+                '<div class="form-group"><label>捡到人</label>'+founderField+'</div>'+
+                '</div>'+
+                '<div class="form-group" style="margin-bottom:18px;"><label>存放位置</label>'+
+                '<input type="text" id="ei_storage" class="form-control" value="'+escapeHtml(it.storage_location||'')+'"></div>'+
+                '<div style="display:flex;gap:10px;">'+
+                '<button type="button" class="btn btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>'+
+                '<button type="submit" class="btn" style="flex:1;">保存修改</button></div>'+
+                '</form>';
+            openModal(html);
+        });
+}
+function submitEditItem(itemId){
+    var fd = new URLSearchParams();
+    fd.append('name', document.getElementById('ei_name').value.trim());
+    fd.append('category', document.getElementById('ei_category').value);
+    fd.append('description', document.getElementById('ei_desc').value.trim());
+    fd.append('found_location', document.getElementById('ei_location').value.trim());
+    fd.append('found_time', document.getElementById('ei_time').value);
+    fd.append('storage_location', document.getElementById('ei_storage').value.trim());
+    fd.append('founder', document.getElementById('ei_founder').value.trim());
+    fetch('/api/item/'+itemId+'/edit', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
+        body: fd.toString()
+    }).then(function(r){return r.json();})
+      .then(function(d){
+          toast(d.msg, d.ok?'success':'error');
+          if(d.ok){
+              var ov = document.querySelector('.modal-overlay'); if(ov) ov.remove();
+              setTimeout(function(){ location.reload(); }, 700);
+          }
+      });
+}
+
 function submitEditClaim(itemId){
     var fd = new URLSearchParams();
     fd.append('claimer_name', document.getElementById('ec_name').value.trim());
