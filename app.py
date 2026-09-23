@@ -16,8 +16,12 @@
 
 import os
 import sqlite3
+import threading
+import time
+from collections import defaultdict, deque
 from datetime import datetime, date
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import (
     Flask, render_template, request, redirect, url_for,
@@ -30,9 +34,58 @@ from openpyxl_export import export_items_to_excel
 app = Flask(__name__)
 app.config["SECRET_KEY"] = config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 单文件最大 16MB
+# CSRF 纵深防御：session cookie 仅同站发送（现代浏览器默认即 Lax，这里显式声明）
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # 确保上传目录存在
 os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
+
+
+# ============================================================
+# 轻量限流（内存滑动窗口，进程内生效；多进程部署时每个进程独立计数）
+# ============================================================
+_RATE_LOCK = threading.Lock()
+_RATE_HITS = defaultdict(deque)  # key -> deque[时间戳]
+
+
+def _rate_limited(key, max_hits, window_seconds):
+    """滑动窗口限流：window_seconds 内同一 key 最多 max_hits 次，超出返回 True。"""
+    now = time.time()
+    with _RATE_LOCK:
+        hits = _RATE_HITS[key]
+        while hits and hits[0] <= now - window_seconds:
+            hits.popleft()
+        if len(hits) >= max_hits:
+            return True
+        hits.append(now)
+        # 防止字典无限增长：清理长期无活动的 key
+        if len(_RATE_HITS) > 5000:
+            for k in [k for k, v in _RATE_HITS.items() if not v]:
+                del _RATE_HITS[k]
+        return False
+
+
+def _client_ip():
+    """取客户端 IP。若经 nginx 反代，信任其转发的第一个地址。"""
+    fwd = request.headers.get("X-Forwarded-For", "")
+    if fwd:
+        return fwd.split(",")[0].strip()
+    return request.remote_addr or "unknown"
+
+
+@app.before_request
+def csrf_origin_check():
+    """CSRF 纵深防御：所有会改数据的请求必须同源（校验 Origin/Referer）。
+    浏览器跨站 POST 一定带 Origin，不匹配直接 403；
+    两个头都缺失时放行（命令行脚本、旧设备、测试场景）。"""
+    if request.method not in ("POST", "PUT", "PATCH", "DELETE"):
+        return None
+    host = request.host  # 含端口
+    for header in (request.headers.get("Origin", ""),
+                   request.headers.get("Referer", "")):
+        if header and urlparse(header).netloc != host:
+            return jsonify({"ok": False, "msg": "跨站请求被拒绝。"}), 403
+    return None
 
 
 # ============================================================
@@ -379,6 +432,11 @@ def public_index():
 def public_report():
     db = get_db()
     if request.method == "POST":
+        # 限流：同一 IP 10 分钟内最多提交 5 次，防恶意刷库/刷照片占磁盘
+        if _rate_limited("report:" + _client_ip(), max_hits=5, window_seconds=600):
+            flash("提交太频繁了，请 10 分钟后再试，或直接到门诊导医台报失。", "error")
+            return redirect(url_for("public_report"))
+
         owner_name = request.form.get("owner_name", "").strip()
         owner_phone = request.form.get("owner_phone", "").strip()
         item_name = request.form.get("item_name", "").strip()
@@ -596,13 +654,14 @@ def public_photo(item_id):
 
 @app.route("/public/item/<int:item_id>")
 def public_item(item_id):
-    """公众版物品详情（智能半盲）：脱敏名称+类别+大概日期，防冒领。"""
+    """公众版物品详情（智能半盲）：脱敏名称+类别+大概日期，防冒领。
+    已认领的物品不再对公众可见。"""
     db = get_db()
     row = db.execute(
         "SELECT id, name, category, found_time, created_at, status FROM items WHERE id=?",
         (item_id,)
     ).fetchone()
-    if not row:
+    if not row or row["status"] != "待认领":
         return jsonify({"ok": False}), 404
     return jsonify({"ok": True, "item": {
         "id": row["id"],
@@ -616,10 +675,12 @@ def public_item(item_id):
 @app.route("/public/photo/<int:item_id>/<int:idx>")
 def public_photo_idx(item_id, idx):
     """公众照片：只给马赛克版（缩放+模糊，看得出是什么、看不清细节）。
-    单张🔒隐藏的照片连马赛克都不给。"""
+    单张🔒隐藏的照片连马赛克都不给；已认领的物品不再对公众提供照片。"""
     db = get_db()
-    row = db.execute("SELECT photo, hidden_photos FROM items WHERE id=?", (item_id,)).fetchone()
-    if not row:
+    row = db.execute(
+        "SELECT photo, hidden_photos, status FROM items WHERE id=?", (item_id,)
+    ).fetchone()
+    if not row or row["status"] != "待认领":
         return _placeholder_img()
     all_photos = [p.strip() for p in (row["photo"] or "").split(",") if p.strip()]
     hidden = set(p.strip() for p in (row["hidden_photos"] or "").split(",") if p.strip())
@@ -725,25 +786,41 @@ def register():
                 hidden_photos_set.add(photo_files[int(idx_str)])
         hidden_photos = ",".join(sorted(hidden_photos_set)) if hidden_photos_set else None
 
-        code = generate_code(db)
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         # 登记人：优先前端传的（可改），没传则用当前登录导医
         registered_by = request.form.get("registered_by", "").strip() or session.get("staff_name", "")
-        db.execute(
-            """INSERT INTO items
-               (code, name, category, description, photo, found_location,
-                found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos, registered_by)
-               VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?,?)""",
-            (code, name, category, description, photo_path,
-             found_location or None, found_time or None, founder or registered_by,
-             now, storage_location or None, hidden_photos, registered_by)
-        )
-        db.commit()
+        # 编号是「查最大序号+1」，并发登记会撞 UNIQUE 约束：
+        # 撞了就回滚换下一个编号重试，而不是 500。
+        new_item = None
+        last_err = None
+        for _attempt in range(10):
+            code = generate_code(db)
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                db.execute(
+                    """INSERT INTO items
+                       (code, name, category, description, photo, found_location,
+                        found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos, registered_by)
+                       VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?,?)""",
+                    (code, name, category, description, photo_path,
+                     found_location or None, found_time or None, founder or registered_by,
+                     now, storage_location or None, hidden_photos, registered_by)
+                )
+                db.commit()
+                new_item = db.execute(
+                    "SELECT * FROM items WHERE code=?", (code,)
+                ).fetchone()
+                break
+            except sqlite3.IntegrityError as e:
+                db.rollback()  # 编号被并发抢占，重新生成
+                last_err = e
+        if new_item is None:
+            msg = f"编号生成冲突过多，请重试。（{last_err}）"
+            if _is_ajax():
+                return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error")
+            return redirect(url_for("register"))
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页
         if _is_ajax():
-            new_item = db.execute(
-                "SELECT * FROM items WHERE code=?", (code,)
-            ).fetchone()
             return jsonify({"ok": True, "item": dict(new_item)})
         # 传统整页提交（独立登记页）：保持原行为
         flash(f"登记成功！失物编号：{code}", "success")
