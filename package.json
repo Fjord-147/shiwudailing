@@ -1,0 +1,16 @@
+{
+  "name": "dailingchu-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "门诊失物招领系统 - Playwright E2E 测试（后端 pytest 见 tests/ 目录）",
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.0"
+  }
+}

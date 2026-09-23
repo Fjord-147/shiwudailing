@@ -111,6 +111,26 @@ http://服务器IP:8000
 - 导出：openpyxl
 - 生产部署：gunicorn（可选）
 
+## 🧪 测试（后端 pytest + Playwright E2E）
+
+测试不写真实数据：后端用临时库，E2E 用专用测试服务器（`tests/e2e/.e2e-tmp/`），`lostfound.db` 和 `uploads/` 不受影响。
+
+```bash
+# 首次准备环境（一次性）
+/usr/bin/python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest
+npm install && npx playwright install chromium
+
+# 后端测试（接口、权限、隐私、登记/认领业务流，约 30 项）
+./.venv/bin/python -m pytest
+
+# E2E 测试（真实浏览器走 登录→登记→认领 全链路，约 10 项）
+npx playwright test
+npx playwright test --ui      # 可视化调试
+npx playwright show-report    # 查看 HTML 报告
+```
+
+测试代码位置：后端在 `tests/test_*.py`，E2E 在 `tests/e2e/*.spec.ts`。新增功能时请同步补测试。
+
 ## 📤 部署到云服务器（规划中）
 
 将来部署到阿里云等服务器时：

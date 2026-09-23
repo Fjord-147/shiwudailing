@@ -40,3 +40,11 @@ dist/
 
 # ===== 工具元数据 =====
 .zcode/
+
+# ===== Node / Playwright E2E =====
+node_modules/
+test-results/
+playwright-report/
+playwright/.cache/
+tests/e2e/.e2e-tmp/
+
