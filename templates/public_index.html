@@ -19,10 +19,18 @@
     <a href="{{ url_for('public_report') }}" class="entry-card entry-report">
         <div class="entry-icon">📝</div>
         <div class="entry-text">
-            <div class="entry-title">没找到 / 我捡到东西</div>
-            <div class="entry-desc">登记报失，等通知</div>
+            <div class="entry-title">没找到？登记报失</div>
+            <div class="entry-desc">失主填写，导医帮您留意</div>
         </div>
     </a>
+</div>
+
+<div class="public-quick-links">
+    <a href="{{ url_for('my_reports') }}">📋 查询我的报失</a>
+    <a href="{{ url_for('public_help') }}">❓ 使用帮助</a>
+</div>
+<div class="finder-hint">
+    💡 捡到物品？请直接交到<strong>门诊导医台</strong>登记，无需网上操作。
 </div>
 
 <!-- 类别筛选 -->

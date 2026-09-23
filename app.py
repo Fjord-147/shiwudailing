@@ -479,11 +479,39 @@ def public_report():
              description, lost_location or None, lost_time or None, photo_path)
         )
         db.commit()
-        flash("报失成功！我们会尽快帮您留意，找到后请到门诊导医台核对认领。", "success")
+        flash("报失成功！我们会尽快帮您留意。您可以在首页「查询我的报失」输入手机号随时查看进度，找到后请到门诊导医台核对认领。", "success")
         return redirect(url_for("public_report"))
 
     default_time = datetime.now().strftime("%Y-%m-%dT%H:%M")
     return render_template("public_report.html", default_time=default_time)
+
+
+# ============================================================
+# 路由：公众查询自己的报失进度 + 使用帮助
+# ============================================================
+@app.route("/my_reports", methods=["GET", "POST"])
+def my_reports():
+    """失主查询自己的报失处理进度：输入报失时填的手机号即可。"""
+    db = get_db()
+    rows = []
+    phone = ""
+    searched = False
+    if request.method == "POST":
+        searched = True
+        phone = request.form.get("phone", "").strip()
+        if phone:
+            rows = db.execute(
+                "SELECT * FROM lost_reports WHERE owner_phone=? ORDER BY id DESC",
+                (phone,),
+            ).fetchall()
+    return render_template("public_my_reports.html", rows=rows,
+                           phone=phone, searched=searched)
+
+
+@app.route("/help")
+def public_help():
+    """公众使用帮助：患者/失主/拾物者的工作流说明。"""
+    return render_template("public_help.html")
 
 
 # ============================================================
@@ -509,17 +537,33 @@ def reports():
 
         # ===== 登记动作：把报失转成失物总表里的一条待认领物品 =====
         if action == "register":
-            code = generate_code(db)
-            db.execute(
-                """INSERT INTO items
-                   (code, name, category, description, photo, found_location,
-                    found_time, founder, status, created_at, source, registered_by)
-                   VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失',?)""",
-                (code, rep["item_name"], rep["item_category"], rep["description"],
-                 rep["photo"], rep["lost_location"], rep["lost_time"],
-                 "患者报失", now, handled_by)
-            )
-            new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
+            # 编号生成有并发竞争，撞 UNIQUE 约束就回滚换号重试（和 /register 一致）
+            new_item_id = None
+            code = None
+            last_err = None
+            for _attempt in range(10):
+                code = generate_code(db)
+                try:
+                    db.execute(
+                        """INSERT INTO items
+                           (code, name, category, description, photo, found_location,
+                            found_time, founder, status, created_at, source, registered_by)
+                           VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失',?)""",
+                        (code, rep["item_name"], rep["item_category"], rep["description"],
+                         rep["photo"], rep["lost_location"], rep["lost_time"],
+                         "患者报失", now, handled_by)
+                    )
+                    db.commit()
+                    new_item_id = db.execute(
+                        "SELECT id FROM items WHERE code=?", (code,)
+                    ).fetchone()["id"]
+                    break
+                except sqlite3.IntegrityError as e:
+                    db.rollback()
+                    last_err = e
+            if new_item_id is None:
+                flash(f"编号生成冲突过多，请重试。（{last_err}）", "error")
+                return redirect(url_for("reports"))
             # 报失标记为已登记，记录关联的物品id
             db.execute(
                 """UPDATE lost_reports SET status='已登记', note=?, handled_by=?, handled_at=?,
@@ -528,6 +572,31 @@ def reports():
             )
             db.commit()
             flash(f"已登记入失物总表，编号 {code}（标记为患者报失）。", "success")
+            return redirect(url_for("reports"))
+
+        # ===== 撤销登记：把「登记入总表」的操作回滚（物品还在待认领时才可以）=====
+        if action == "undo_register":
+            if rep["status"] != "已登记" or not rep["matched_item_id"]:
+                flash("该报失没有可撤销的登记记录。", "error")
+                return redirect(url_for("reports"))
+            item = db.execute(
+                "SELECT * FROM items WHERE id=?", (rep["matched_item_id"],)
+            ).fetchone()
+            if not item:
+                flash("关联的物品记录已不存在。", "error")
+                return redirect(url_for("reports"))
+            if item["status"] == "已认领":
+                flash("该物品已被认领，不能撤销登记。", "error")
+                return redirect(url_for("reports"))
+            _remove_photos(item["photo"], item["claimer_photo"])
+            db.execute("DELETE FROM items WHERE id=?", (item["id"],))
+            db.execute(
+                """UPDATE lost_reports SET status='待查找', matched_item_id=NULL,
+                   note=?, handled_by=?, handled_at=? WHERE id=?""",
+                (note or "已撤销登记，重新查找", handled_by, now, report_id)
+            )
+            db.commit()
+            flash(f"已撤销登记：{item['code']} 已从总表移除，该报失重新进入待查找。", "success")
             return redirect(url_for("reports"))
 
         # ===== 其他动作：标记状态 =====

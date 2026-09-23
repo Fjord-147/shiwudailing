@@ -1,0 +1,65 @@
+{% extends "base_public.html" %}
+{% block title %}查询我的报失 - 苏州和康中医医院{% endblock %}
+{% block content %}
+
+<div class="public-hero">
+    <h1>📋 查询我的报失</h1>
+    <p>输入<strong>报失时填写的手机号</strong>，即可查看您的报失处理进度。</p>
+</div>
+
+<div class="card">
+    <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <input type="tel" name="phone" class="form-control" style="flex:1;min-width:220px;"
+               placeholder="报失时填写的手机号" value="{{ phone }}" required>
+        <button type="submit" class="btn">查询</button>
+    </form>
+</div>
+
+{% if searched %}
+    {% if rows %}
+    <div class="report-list">
+        {% for r in rows %}
+        <div class="report-card">
+            <div class="report-card-head">
+                <span class="report-item-name">{{ r.item_name }}</span>
+                {% if r.status == '待查找' %}
+                    <span class="tag tag-pending">待查找</span>
+                {% elif r.status == '已找到' %}
+                    <span class="tag tag-returned">已找到</span>
+                {% elif r.status == '已登记' %}
+                    <span class="tag tag-source">已登记</span>
+                {% else %}
+                    <span class="tag tag-muted">已忽略</span>
+                {% endif %}
+                <span class="report-time">{{ r.created_at }}</span>
+            </div>
+            <div class="report-detail" style="padding:10px 14px;">
+                {% if r.status == '待查找' %}
+                    <div style="color:#6b7280;font-size:13px;">已收到您的报失，导医会帮您留意。请保持电话畅通，也可主动到导医台询问。</div>
+                {% elif r.status == '已找到' %}
+                    <div style="color:#2e7d32;font-size:13px;">🎉 您的物品找到了！请本人尽快到门诊导医台核对认领。</div>
+                {% elif r.status == '已登记' %}
+                    <div style="color:#2E7D9B;font-size:13px;">您的报失已转入失物招领列表，如有匹配的拾物会第一时间联系您。</div>
+                {% else %}
+                    <div style="color:#6b7280;font-size:13px;">该报失暂未匹配到物品。如有疑问请到导医台咨询。</div>
+                {% endif %}
+                {% if r.note %}
+                <div style="color:#8b5cf6;font-size:13px;margin-top:6px;">导医备注：{{ r.note }}</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty public-empty">
+        <div style="font-size:44px;margin-bottom:12px;">🔍</div>
+        <p>没有找到该手机号的报失记录</p>
+        <p style="font-size:13px;margin-top:8px;">请核对手机号是否和报失时填写的一致；如需帮助请到门诊导医台询问。</p>
+    </div>
+    {% endif %}
+{% endif %}
+
+<div class="blind-note">
+    🔒 为保护隐私，这里只显示您自己报失的处理进度，不展示任何其他人的信息。
+</div>
+{% endblock %}

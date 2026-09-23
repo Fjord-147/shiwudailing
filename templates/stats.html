@@ -35,6 +35,7 @@
 <div class="card">
     <h2>按类别统计</h2>
     {% if by_category %}
+    <div class="table-wrap">
     <table class="data">
         <thead>
             <tr><th>类别</th><th>数量</th></tr>
@@ -48,6 +49,7 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
     {% else %}
     <div class="empty">该时间段无数据</div>
     {% endif %}

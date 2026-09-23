@@ -1,0 +1,40 @@
+{% extends "base_public.html" %}
+{% block title %}使用帮助 - 苏州和康中医医院{% endblock %}
+{% block content %}
+
+<div class="public-hero">
+    <h1>❓ 使用帮助</h1>
+    <p>失物招领的完整流程，按您的角色查看。</p>
+</div>
+
+<div class="help-section card">
+    <h2>🙋 我是失主（丢了东西）</h2>
+    <ol class="help-steps">
+        <li><strong>先找：</strong>在<a href="{{ url_for('public_index') }}">失物招领首页</a>浏览「待认领」物品（照片已马赛克、名称已隐去细节，防冒领）。</li>
+        <li><strong>没找到？</strong>点「没找到？登记报失」填写丢失信息，越详细越好（特征、时间、地点）。</li>
+        <li><strong>查进度：</strong>在<a href="{{ url_for('my_reports') }}">查询我的报失</a>输入手机号，随时查看处理状态。</li>
+        <li><strong>去认领：</strong>收到通知（或看到匹配）后，<strong>本人带有效证件</strong>到门诊导医台，描述物品特征核对无误后归还。</li>
+    </ol>
+</div>
+
+<div class="help-section card">
+    <h2>🤲 我捡到了东西</h2>
+    <p>请直接交到<strong>门诊导医台</strong>，由导医登记入库（拍照、编号、上架公示）。<br>
+    捡到物品<strong>无需在网上登记</strong>——网上报失入口只面向失主。</p>
+</div>
+
+<div class="help-section card">
+    <h2>🏥 我是导医 / 管理员</h2>
+    <ol class="help-steps">
+        <li>公众页右上角「管理员入口」登录（账号密码由信息科发放）。</li>
+        <li><strong>拾物登记</strong>：工作台或「拾物登记」页录入物品+照片，自动生成编号。</li>
+        <li><strong>认领登记</strong>：失主到场描述特征 → 勾选「已核对物品特征」→ 录入认领人信息 → 状态变「已认领」。</li>
+        <li><strong>报失处理</strong>：处理公众报失，可直接「登记入总表」或「已找到」一步到位。</li>
+        <li><strong>统计导出</strong>：按时间段统计，一键导出 Excel 留档。</li>
+    </ol>
+</div>
+
+<div class="blind-note">
+    🔒 隐私说明：认领人姓名/电话、报失人信息仅管理员可见；公众端照片一律马赛克处理，已认领物品自动下架。
+</div>
+{% endblock %}

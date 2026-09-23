@@ -38,6 +38,8 @@
                 <span class="tag tag-pending">待查找</span>
             {% elif r.status == '已找到' %}
                 <span class="tag tag-returned">已找到</span>
+            {% elif r.status == '已登记' %}
+                <span class="tag tag-source">已登记</span>
             {% else %}
                 <span class="tag tag-muted">已忽略</span>
             {% endif %}
@@ -87,6 +89,15 @@
                 <button type="submit" name="action" value="ignore" class="btn btn-secondary btn-sm" onclick="document.getElementById('noteHiddenIg_{{ r.id }}').value=document.getElementById('note_{{ r.id }}').value;return confirm('确定要忽略这条报失吗？忽略后可在「已忽略」里恢复。')">忽略</button>
             </form>
         </div>
+        {% elif r.status == '已登记' %}
+        <div class="report-handled" style="margin:0 0 8px;">
+            ✅ 已转入失物总表（可在「失物总表」中查看，来源标记为患者报失）。
+        </div>
+        <form method="post" class="report-actions">
+            <input type="hidden" name="report_id" value="{{ r.id }}">
+            <button type="submit" name="action" value="undo_register" class="btn btn-secondary btn-sm"
+                    onclick="return confirm('撤销登记：关联的物品将从失物总表移除，该报失重新进入待查找。继续吗？')">↩ 撤销登记</button>
+        </form>
         {% else %}
         <form method="post" class="report-actions">
             <input type="hidden" name="report_id" value="{{ r.id }}">
