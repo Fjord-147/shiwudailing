@@ -160,6 +160,9 @@ def inject_globals():
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # 已登录再访问登录页：直接回工作台（和后台其它页面的会话恢复保持一致）
+    if request.method == "GET" and session.get("logged_in"):
+        return redirect(url_for("index"))
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
@@ -1068,7 +1071,8 @@ def api_edit_founder(item_id):
 @login_required
 def api_edit_item(item_id):
     """编辑物品基本信息：名称/类别/特征/地点/时间/存放位置/捡到人。
-    编号和照片不变；患者报失的捡到人固定不可改。"""
+    编号和照片文件不变；可修改各照片的公众可见性（hidden_photos）。
+    患者报失的捡到人固定不可改。"""
     db = get_db()
     item = db.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
     if not item:
@@ -1084,11 +1088,24 @@ def api_edit_item(item_id):
     founder = request.form.get("founder", "").strip()
     if item["source"] == "患者报失":
         founder = "患者报失"  # 患者报失的固定不变
+    # 照片可见性：hidden_photos 只接受「该物品已有照片」的子集，防止越权隐藏别的文件
+    sql_hidden = ""
+    params_hidden = ()
+    if request.form.get("hidden_photos") is not None:
+        all_photos = {p.strip() for p in (item["photo"] or "").split(",") if p.strip()}
+        hidden_set = {p.strip() for p in request.form.get("hidden_photos", "").split(",") if p.strip()}
+        invalid = hidden_set - all_photos
+        if invalid:
+            return jsonify({"ok": False, "msg": "包含不属于该物品的照片，已拒绝保存。"})
+        sql_hidden = ", hidden_photos=?"
+        params_hidden = (",".join(sorted(hidden_set)) if hidden_set else None,)
+
     db.execute(
-        """UPDATE items SET name=?, category=?, description=?, found_location=?,
-           found_time=?, storage_location=?, founder=? WHERE id=?""",
+        f"""UPDATE items SET name=?, category=?, description=?, found_location=?,
+           found_time=?, storage_location=?, founder=?{sql_hidden} WHERE id=?""",
         (name, category or None, description or None, found_location or None,
-         found_time or None, storage_location or None, founder or None, item_id)
+         found_time or None, storage_location or None, founder or None,
+         *params_hidden, item_id)
     )
     db.commit()
     return jsonify({"ok": True, "msg": f"物品信息已更新（{item['code']}）。"})

@@ -393,10 +393,28 @@ function editItem(itemId){
             var catOpts = ITEM_CATEGORIES.map(function(c){
                 return '<option value="'+c+'"'+(it.category===c?' selected':'')+'>'+c+'</option>';
             }).join('');
+            // 照片可见性管理：列出该物品所有照片，勾选 = 对公众隐藏
+            var photos = (it.photo||'').split(',').map(function(s){return s.trim();}).filter(Boolean);
+            var hiddenSet = new Set((it.hidden_photos||'').split(',').map(function(s){return s.trim();}).filter(Boolean));
+            var photoSection = '';
+            if (photos.length){
+                photoSection =
+                '<div class="form-group" style="margin-bottom:18px;"><label>照片可见性（公众端）</label>'+
+                '<div style="border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;">'+
+                photos.map(function(p, i){
+                    var isHidden = hiddenSet.has(p);
+                    return '<label class="checkbox-row" style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'+
+                        '<input type="checkbox" class="ei_hidephoto" value="'+escapeHtml(p)+'"'+(isHidden?' checked':'')+'>'+
+                        '<span>照片'+(i+1)+'（'+escapeHtml(p)+'）'+(isHidden?' <span style="color:#b45309;">· 当前已隐藏</span>':'')+'</span>'+
+                    '</label>';
+                }).join('')+
+                '<div style="color:#6b7280;font-size:12px;margin-top:4px;">🔒 勾选后，公众界面（含马赛克图）将不再显示该照片；取消勾选可恢复显示。</div>'+
+                '</div></div>';
+            }
             var html =
                 '<form onsubmit="event.preventDefault();submitEditItem('+itemId+')">'+
                 '<div style="font-size:18px;font-weight:600;margin-bottom:4px;">编辑物品信息</div>'+
-                '<div style="color:#6b7280;font-size:13px;margin-bottom:16px;">编号 '+escapeHtml(it.code)+'（编号和照片不变）</div>'+
+                '<div style="color:#6b7280;font-size:13px;margin-bottom:16px;">编号 '+escapeHtml(it.code)+'（编号不变；照片可在下方调整可见性）</div>'+
                 '<div class="form-group" style="margin-bottom:14px;"><label>物品名称 <span class="req">*</span></label>'+
                 '<input type="text" id="ei_name" class="form-control" value="'+escapeHtml(it.name||'')+'" required></div>'+
                 '<div class="form-row2">'+
@@ -411,6 +429,7 @@ function editItem(itemId){
                 '</div>'+
                 '<div class="form-group" style="margin-bottom:18px;"><label>存放位置</label>'+
                 '<input type="text" id="ei_storage" class="form-control" value="'+escapeHtml(it.storage_location||'')+'"></div>'+
+                photoSection+
                 '<div style="display:flex;gap:10px;">'+
                 '<button type="button" class="btn btn-secondary" style="flex:1;" onclick="this.closest(\'.modal-overlay\').remove()">取消</button>'+
                 '<button type="submit" class="btn" style="flex:1;">保存修改</button></div>'+
@@ -427,6 +446,12 @@ function submitEditItem(itemId){
     fd.append('found_time', document.getElementById('ei_time').value);
     fd.append('storage_location', document.getElementById('ei_storage').value.trim());
     fd.append('founder', document.getElementById('ei_founder').value.trim());
+    // 收集照片可见性：所有勾选的隐藏照片，逗号分隔（无照片时传空串，清空隐藏列表）
+    var hiddenPhotos = Array.prototype.map.call(
+        document.querySelectorAll('.ei_hidephoto:checked'),
+        function(cb){ return cb.value; }
+    );
+    fd.append('hidden_photos', document.querySelectorAll('.ei_hidephoto').length ? hiddenPhotos.join(',') : '');
     fetch('/api/item/'+itemId+'/edit', {
         method:'POST',
         headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'fetch'},
