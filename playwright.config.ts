@@ -23,7 +23,9 @@ export default defineConfig({
     // 由测试专用脚本启动 Flask（临时库），就绪探测 /login
     command: './.venv/bin/python tests/e2e/run_test_server.py',
     url: 'http://127.0.0.1:8765/login',
-    reuseExistingServer: !process.env.CI,
+    // 默认绝不复用已有进程：本地 8765 一旦有残留/旧代码/脏库的服务器，
+    // 复用会让测试打偏（出现过成批假失败）。需要 --ui 连调时显式 REUSE_SERVER=1。
+    reuseExistingServer: process.env.REUSE_SERVER === '1',
     timeout: 30_000,
   },
 });

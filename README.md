@@ -129,6 +129,11 @@ npx playwright test --ui      # 可视化调试
 npx playwright show-report    # 查看 HTML 报告
 ```
 
+> 注意：`npx playwright test` 会**独占** 127.0.0.1:8765 并自动拉起/销毁测试服务器。
+> 如果报 `port 8765 is already used`，说明有残留进程，先 `pkill -f run_test_server.py` 再跑——
+> 这样设计是为了防止测试打到旧的/脏的残留服务器上产生假失败。
+> 需要 `--ui` 连着调试会话复用服务器时，用 `REUSE_SERVER=1 npx playwright test --ui`。
+
 测试代码位置：后端在 `tests/test_*.py`，E2E 在 `tests/e2e/*.spec.ts`。新增功能时请同步补测试。
 
 ## 📤 部署到云服务器（规划中）
