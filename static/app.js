@@ -209,70 +209,10 @@ function toggleOther(select, otherId) {
     other.style.display = (select.value === "__other__") ? "block" : "none";
 }
 
-/* ===== 详情弹窗（列表页点行用）===== */
-function showDetail(itemId) {
-    fetch("/api/item/" + itemId).then(function (r) { return r.json(); })
-        .then(function (data) {
-            if (!data.ok) { toast("读取失败", "error"); return; }
-            var it = data.item;
-            // 照片：解析逗号分隔的多张，横向排列
-            var photos = it.photo ? it.photo.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
-            var photoHtml;
-            if (photos.length > 0) {
-                var pAttr = btoa(unescape(encodeURIComponent(JSON.stringify(photos))));
-                photoHtml = '<div class="detail-photos" data-p="' + pAttr + '">' + photos.map(function(p, i){
-                    return '<img class="photo-big" src="/uploads/' + p + '" data-idx="' + i + '" onclick="gZoomFromImg(this)">';
-                }).join('') + '</div>';
-            } else {
-                photoHtml = '<div style="color:#999;margin:10px 0;">（无照片）</div>';
-            }
-            var claimHtml = it.status === "已认领"
-                ? '<div style="margin-top:14px;padding-top:12px;border-top:1px dashed #ccc;">' +
-                  '<strong>认领信息</strong><br>' +
-                  '认领人：' + (it.claimer_name || "") + '　' +
-                  '电话：' + (it.claimer_phone || "未留") + '<br>' +
-                  '人群：' + (it.claimer_group || "未选") + '　' +
-                  '性别：' + (it.claimer_gender || "未选") + '<br>' +
-                  '认领时间：' + (it.claimed_at || "") + '　' +
-                  '经办人：' + (it.operator || "") + '<br>' +
-                  '特征已核实：' + (it.feature_verified ? "是" : "否") +
-                  (it.claimer_photo
-                      ? '<br><span class="k">认领人照片：</span><br>' +
-                        '<img src="/uploads/' + it.claimer_photo + '" style="max-width:140px;max-height:140px;border-radius:6px;margin-top:4px;border:1px solid #e2e8f0;cursor:zoom-in;" onclick="gZoomOpen([\'' + it.claimer_photo + '\'],0)">'
-                      : '') +
-                  '<div class="claim-actions">' +
-                    '<button class="btn btn-sm btn-danger-outline" onclick="doUnclaim(' + it.id + ',\'' + escapeHtml(it.code) + '\')">↩ 撤销认领</button>' +
-                    '<button class="btn btn-sm btn-secondary" onclick="doEditClaim(' + JSON.stringify(it).replace(/'/g,"&#39;") + ')">✎ 修改信息</button>' +
-                    '<button class="btn btn-sm btn-danger-outline" onclick="doDelete(' + it.id + ',\'' + escapeHtml(it.code) + '\',\'' + escapeHtml(it.name) + '\')">🗑 删除记录</button>' +
-                  '</div>' +
-                  '</div>'
-                : "";
-            var html =
-                '<div class="detail-panel" style="margin:0;">' +
-                '<div><span class="code" style="color:#666;font-size:13px;">编号 ' + it.code + '</span>' +
-                '<span class="tag ' + (it.status === "已认领" ? "tag-returned" : "tag-pending") +
-                '" style="margin-left:10px;">' + it.status + '</span></div>' +
-                '<div style="font-size:18px;font-weight:600;margin:6px 0;">' + it.name + '</div>' +
-                photoHtml +
-                '<div class="detail-grid">' +
-                '<div><span class="k">类别：</span><span class="v">' + (it.category || "—") + '</span></div>' +
-                '<div><span class="k">捡到地点：</span><span class="v">' + (it.found_location || "—") + '</span></div>' +
-                '<div><span class="k">存放位置：</span><span class="v">' + (it.storage_location || "—") + '</span></div>' +
-                '<div><span class="k">捡到时间：</span><span class="v">' + (it.found_time || "—") + '</span></div>' +
-                '<div><span class="k">捡到人：</span><span class="v">' + (it.founder || "—") + '</span></div>' +
-                '<div><span class="k">登记时间：</span><span class="v">' + (it.created_at || "—") + '</span></div>' +
-                '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">' +
-                (it.description || "—") + '</span></div>' +
-                '</div>' + claimHtml +
-                (it.status === "待认领"
-                    ? '<div class="claim-actions" style="margin-top:14px;padding-top:12px;border-top:1px dashed #ccc;">' +
-                      '<button class="btn btn-sm btn-danger-outline" onclick="doDelete(' + it.id + ',\'' + escapeHtml(it.code) + '\',\'' + escapeHtml(it.name) + '\')">🗑 删除记录</button>' +
-                      '</div>'
-                    : '') +
-                '</div>';
-            openModal(html);
-        });
-}
+/* 注：此处曾有一个 showDetail() 死函数——把 it.name/description/认领人字段
+   未转义拼进 innerHTML。它从未被调用，但公众报失字段原样入库，
+   一旦有人把它接到页面上就是现成的存储型 XSS。已整体删除；
+   详情渲染请用 list.html / claims_manage.html 里转义规范的现成实现。 */
 
 /* ===== 通用模态框 ===== */
 function openModal(contentHtml) {

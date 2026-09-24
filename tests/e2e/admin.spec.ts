@@ -132,4 +132,41 @@ test.describe('管理员后台', () => {
     await expect(cardHidden.locator('.goods-photo img')).toHaveCount(0);
     await expect(cardHidden.locator('.goods-photo-placeholder')).toHaveCount(1);
   });
+
+  test('存储型 XSS：恶意报失字段在管理端所有渲染点都不执行', async ({ page }) => {
+    test.slow();
+    // 1. 攻击者提交带 XSS 载荷的报失（名称+描述都埋 onerror/onload）
+    await page.goto('/report');
+    await page.fill('input[name="owner_name"]', '攻击者');
+    await page.fill('input[name="owner_phone"]', '13800007777');
+    await page.fill('input[name="item_name"]', 'XSS<img src=x onerror="window.__xss=1">');
+    await page.fill('textarea[name="description"]', '<svg onload="window.__xss=1">');
+    await page.check('.checkbox-row input[type="checkbox"]');
+    await page.locator('button[type="submit"]').click();
+    await expect(page.locator('.flash')).toContainText('报失成功');
+
+    // 2. 管理员登录并查看报失处理页（Jinja 自动转义渲染）
+    await loginAsAdmin(page);
+    await page.goto('/reports?status=待查找');
+    await expect(page.locator('.report-card', { hasText: 'XSS' })).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+
+    // 3. 一键转入总表（恶意内容原样入库）
+    page.once('dialog', (d) => d.accept());
+    await page.locator('.report-card', { hasText: 'XSS' })
+      .getByRole('button', { name: /登记入总表/ }).click();
+    await expect(page.locator('.flash')).toContainText('已登记入失物总表');
+
+    // 4. 总表：打开认领抽屉（JS innerHTML 渲染，必须转义）
+    await page.goto('/list');
+    const row = page.locator('tr', { hasText: 'XSS' });
+    await expect(row).toHaveCount(1);
+    await row.getByRole('button', { name: '认领' }).click();
+    await expect(page.locator('#listClaimDetail')).toContainText('window.__xss=1');
+    expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+
+    // 5. 工作台等其他管理页也不执行
+    await page.goto('/admin');
+    expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+  });
 });
