@@ -217,12 +217,18 @@ def _is_ajax():
     return request.headers.get("X-Requested-With") == "fetch"
 
 
+def _is_safe_next(path):
+    """登录后回跳目标只允许站内路径：以单个 / 开头，禁止 // 协议相对形式。"""
+    return bool(path) and path.startswith("/") and not path.startswith("//")
+
+
 def login_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         if not session.get("logged_in"):
-            # 记住原地址，登录后跳回
-            session["next_url"] = request.path
+            # 记住原地址，登录后跳回（只记站内路径，防 open redirect）
+            if _is_safe_next(request.path):
+                session["next_url"] = request.path
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return wrapper
@@ -259,6 +265,9 @@ def login():
             session["staff_name"] = user["name"]  # 存真名（如"刘敏"）
             session["username"] = username
             nxt = session.pop("next_url", None)
+            # session 里的值不可信（可能被构造），回跳前再校验一次
+            if not _is_safe_next(nxt):
+                nxt = None
             return redirect(nxt or url_for("index"))
         _rate_record(limit_key)
         flash("账号或密码错误，请重试。", "error")
@@ -1053,6 +1062,9 @@ def claim():
              claimer_photo, claimer_group or None, claimer_gender or None, item_id)
         )
         if cur.rowcount == 0:
+            # 并发竞争失败：本次上传的认领人照片没了归属，立即清掉防孤儿文件
+            if claimer_photo:
+                _remove_photos(claimer_photo)
             msg = "该物品刚被其他人认领，请刷新确认。"
             if _is_ajax(): return jsonify({"ok": False, "msg": msg})
             flash(msg, "error"); return redirect(url_for("claim"))

@@ -31,6 +31,17 @@ COLUMNS = [
 ]
 
 
+def _safe_cell(val):
+    """防 Excel 公式注入：以 = + - @ 开头的值前加单引号，强制按纯文本处理。
+
+    物品名称/描述来自公众报失，原样入库；导出时被 Excel 当公式执行（如
+    =HYPERLINK(...)）会在管理员打开导出的瞬间发起请求/执行命令。
+    """
+    if isinstance(val, str) and val[:1] in ("=", "+", "-", "@"):
+        return "'" + val
+    return val
+
+
 def export_items_to_excel(items):
     """items: sqlite3.Row 列表，导出为 Excel 下载。"""
     wb = Workbook()
@@ -57,7 +68,7 @@ def export_items_to_excel(items):
             val = row.get(key, "")
             if key == "feature_verified":
                 val = "是" if val else ("否" if val == 0 else "")
-            line.append(val if val is not None else "")
+            line.append(_safe_cell(val) if val is not None else "")
         ws.append(line)
 
     # 列宽

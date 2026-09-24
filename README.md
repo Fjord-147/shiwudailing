@@ -77,6 +77,16 @@ http://服务器IP:8000
 
 **定期把这两个拷走即可备份。**
 
+服务器上也可以用自带的 `backup.sh` 自动备份（数据库走 SQLite 在线备份接口，照片直接复制，保留最近 30 天）：
+
+```bash
+bash backup.sh                 # 备份到 ./backups/日期/
+# 或指定备份位置：
+BAK_ROOT=/opt/backups/lostfound bash backup.sh
+# 配 crontab 每天凌晨 3 点自动跑：
+# 0 3 * * * /path/to/项目/backup.sh >> /path/to/项目/backups/backup.log 2>&1
+```
+
 ## 📁 项目结构
 
 ```
