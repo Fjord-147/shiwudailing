@@ -29,6 +29,7 @@ def client(tmp_path, monkeypatch):
     import app
     app.app.config.update(TESTING=True, SECRET_KEY="test-secret-key")
     app.init_db()
+    app._RATE_HITS.clear()  # 每个测试清空限流计数，避免用例间串扰（全局内存态）
 
     with app.app.test_client() as c:
         yield c

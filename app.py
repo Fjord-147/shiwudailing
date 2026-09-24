@@ -272,6 +272,26 @@ def generate_code(conn):
     return f"{prefix}{seq:03d}"
 
 
+def _insert_item_with_retry(db, do_insert):
+    """生成失物编号并插入物品；撞编号 UNIQUE 约束时回滚换号重试。
+
+    do_insert(code, now_str) 负责执行 INSERT 语句（参数里带上 code 和 created_at）。
+    返回 (code, item_id)；重试耗尽返回 (None, None)。
+    所有往 items 表插入新记录的入口都必须走这里，不要自己 generate_code + INSERT。
+    """
+    for _attempt in range(10):
+        code = generate_code(db)
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            do_insert(code, now)
+            db.commit()
+            row = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()
+            return code, row["id"]
+        except sqlite3.IntegrityError:
+            db.rollback()  # 编号被并发抢占，重新生成
+    return None, None
+
+
 def allowed_photo(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in {
         "jpg", "jpeg", "png", "gif", "bmp", "webp"
@@ -542,32 +562,20 @@ def reports():
 
         # ===== 登记动作：把报失转成失物总表里的一条待认领物品 =====
         if action == "register":
-            # 编号生成有并发竞争，撞 UNIQUE 约束就回滚换号重试（和 /register 一致）
-            new_item_id = None
-            code = None
-            last_err = None
-            for _attempt in range(10):
-                code = generate_code(db)
-                try:
-                    db.execute(
-                        """INSERT INTO items
-                           (code, name, category, description, photo, found_location,
-                            found_time, founder, status, created_at, source, registered_by)
-                           VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失',?)""",
-                        (code, rep["item_name"], rep["item_category"], rep["description"],
-                         rep["photo"], rep["lost_location"], rep["lost_time"],
-                         "患者报失", now, handled_by)
-                    )
-                    db.commit()
-                    new_item_id = db.execute(
-                        "SELECT id FROM items WHERE code=?", (code,)
-                    ).fetchone()["id"]
-                    break
-                except sqlite3.IntegrityError as e:
-                    db.rollback()
-                    last_err = e
+            def do_insert(code, created_at):
+                db.execute(
+                    """INSERT INTO items
+                       (code, name, category, description, photo, found_location,
+                        found_time, founder, status, created_at, source, registered_by)
+                       VALUES (?,?,?,?,?,?,?,?,'待认领',?,'患者报失',?)""",
+                    (code, rep["item_name"], rep["item_category"], rep["description"],
+                     rep["photo"], rep["lost_location"], rep["lost_time"],
+                     "患者报失", created_at, handled_by)
+                )
+
+            code, new_item_id = _insert_item_with_retry(db, do_insert)
             if new_item_id is None:
-                flash(f"编号生成冲突过多，请重试。（{last_err}）", "error")
+                flash("编号生成冲突过多，请重试。", "error")
                 return redirect(url_for("reports"))
             # 报失标记为已登记，记录关联的物品id
             db.execute(
@@ -691,22 +699,25 @@ def report_found_claim(report_id):
             f.write(_b64.b64decode(b64))
         claimer_photo = fname
 
-    # 生成物品（患者报失 + 直接已认领）
-    code = generate_code(db)
-    db.execute(
-        """INSERT INTO items
-           (code, name, category, description, photo, found_location,
-            found_time, founder, status, created_at, source, registered_by,
-            claimer_name, claimer_phone, claimer_group, claimer_gender,
-            feature_verified, claimed_at, operator, claimer_photo)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-        (code, rep["item_name"], rep["item_category"], rep["description"],
-         rep["photo"], rep["lost_location"], rep["lost_time"], "患者报失",
-         "已认领", now, "患者报失", operator,
-         claimer_name, claimer_phone or None, claimer_group or None,
-         claimer_gender or None, 1, now, operator, claimer_photo)
-    )
-    new_item_id = db.execute("SELECT id FROM items WHERE code=?", (code,)).fetchone()["id"]
+    # 生成物品（患者报失 + 直接已认领）；编号撞唯一约束自动换号重试
+    def do_insert(code, created_at):
+        db.execute(
+            """INSERT INTO items
+               (code, name, category, description, photo, found_location,
+                found_time, founder, status, created_at, source, registered_by,
+                claimer_name, claimer_phone, claimer_group, claimer_gender,
+                feature_verified, claimed_at, operator, claimer_photo)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (code, rep["item_name"], rep["item_category"], rep["description"],
+             rep["photo"], rep["lost_location"], rep["lost_time"], "患者报失",
+             "已认领", created_at, "患者报失", operator,
+             claimer_name, claimer_phone or None, claimer_group or None,
+             claimer_gender or None, 1, now, operator, claimer_photo)
+        )
+
+    code, new_item_id = _insert_item_with_retry(db, do_insert)
+    if new_item_id is None:
+        return jsonify({"ok": False, "msg": "编号生成冲突过多，请重试。"})
     # 报失标记已找到
     db.execute(
         """UPDATE lost_reports SET status='已找到', handled_by=?, handled_at=?,
@@ -862,37 +873,28 @@ def register():
 
         # 登记人：优先前端传的（可改），没传则用当前登录导医
         registered_by = request.form.get("registered_by", "").strip() or session.get("staff_name", "")
-        # 编号是「查最大序号+1」，并发登记会撞 UNIQUE 约束：
-        # 撞了就回滚换下一个编号重试，而不是 500。
-        new_item = None
-        last_err = None
-        for _attempt in range(10):
-            code = generate_code(db)
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            try:
-                db.execute(
-                    """INSERT INTO items
-                       (code, name, category, description, photo, found_location,
-                        found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos, registered_by)
-                       VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?,?)""",
-                    (code, name, category, description, photo_path,
-                     found_location or None, found_time or None, founder or registered_by,
-                     now, storage_location or None, hidden_photos, registered_by)
-                )
-                db.commit()
-                new_item = db.execute(
-                    "SELECT * FROM items WHERE code=?", (code,)
-                ).fetchone()
-                break
-            except sqlite3.IntegrityError as e:
-                db.rollback()  # 编号被并发抢占，重新生成
-                last_err = e
-        if new_item is None:
-            msg = f"编号生成冲突过多，请重试。（{last_err}）"
+        # 编号生成有并发竞争，撞 UNIQUE 约束自动换号重试（见 _insert_item_with_retry）
+        def do_insert(code, now):
+            db.execute(
+                """INSERT INTO items
+                   (code, name, category, description, photo, found_location,
+                    found_time, founder, status, created_at, hide_photo, storage_location, hidden_photos, registered_by)
+                   VALUES (?,?,?,?,?,?,?,?,'待认领',?,0,?,?,?)""",
+                (code, name, category, description, photo_path,
+                 found_location or None, found_time or None, founder or registered_by,
+                 now, storage_location or None, hidden_photos, registered_by)
+            )
+
+        code, new_item_id = _insert_item_with_retry(db, do_insert)
+        if new_item_id is None:
+            msg = "编号生成冲突过多，请重试。"
             if _is_ajax():
                 return jsonify({"ok": False, "msg": msg})
             flash(msg, "error")
             return redirect(url_for("register"))
+        new_item = db.execute(
+            "SELECT * FROM items WHERE id=?", (new_item_id,)
+        ).fetchone()
         # AJAX 提交（工作台抽屉）：返回 JSON，前端弹提醒、不跳页
         if _is_ajax():
             return jsonify({"ok": True, "item": dict(new_item)})
