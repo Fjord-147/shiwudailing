@@ -135,12 +135,15 @@ test.describe('管理员后台', () => {
 
   test('存储型 XSS：恶意报失字段在管理端所有渲染点都不执行', async ({ page }) => {
     test.slow();
-    // 1. 攻击者提交带 XSS 载荷的报失（名称+描述都埋 onerror/onload）
+    // 1. 攻击者提交带 XSS 载荷的报失（名称+描述都埋 onerror/onload）。
+    //    类别选「病历/检查单」——public.spec 的空态断言占用了「证件」类别，
+    //    用没人占用的类别避免用例间数据串扰（E2E 整跑共享同一测试库）
     await page.goto('/report');
     await page.fill('input[name="owner_name"]', '攻击者');
     await page.fill('input[name="owner_phone"]', '13800007777');
     await page.fill('input[name="item_name"]', 'XSS<img src=x onerror="window.__xss=1">');
     await page.fill('textarea[name="description"]', '<svg onload="window.__xss=1">');
+    await page.selectOption('select[name="item_category"]', { label: '病历/检查单' });
     await page.check('.checkbox-row input[type="checkbox"]');
     await page.locator('button[type="submit"]').click();
     await expect(page.locator('.flash')).toContainText('报失成功');
