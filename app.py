@@ -48,6 +48,29 @@ _RATE_LOCK = threading.Lock()
 _RATE_HITS = defaultdict(deque)  # key -> deque[时间戳]
 
 
+def _rate_check(key, max_hits, window_seconds):
+    """只检查不记录：window_seconds 内该 key 是否已达 max_hits 次。"""
+    now = time.time()
+    with _RATE_LOCK:
+        hits = _RATE_HITS[key]
+        while hits and hits[0] <= now - window_seconds:
+            hits.popleft()
+        return len(hits) >= max_hits
+
+
+def _rate_record(key):
+    """记一次命中（供 _rate_check 统计）。"""
+    with _RATE_LOCK:
+        _RATE_HITS[key].append(time.time())
+
+
+def _rate_gc(now):
+    """字典瘦身：清掉最近 1 小时都无活动的 key，防止字典无限增长。"""
+    cutoff = now - 3600
+    for k in [k for k, v in _RATE_HITS.items() if not v or v[-1] < cutoff]:
+        _RATE_HITS.pop(k, None)
+
+
 def _rate_limited(key, max_hits, window_seconds):
     """滑动窗口限流：window_seconds 内同一 key 最多 max_hits 次，超出返回 True。"""
     now = time.time()
@@ -58,10 +81,10 @@ def _rate_limited(key, max_hits, window_seconds):
         if len(hits) >= max_hits:
             return True
         hits.append(now)
-        # 防止字典无限增长：清理长期无活动的 key
+        # 防止字典无限增长：超阈值时清理长时间无活动的 key
+        # （旧实现只删「已空」的 key，而 key 只有被再次访问才会排空，形同虚设）
         if len(_RATE_HITS) > 5000:
-            for k in [k for k, v in _RATE_HITS.items() if not v]:
-                del _RATE_HITS[k]
+            _rate_gc(now)
         return False
 
 
@@ -224,6 +247,12 @@ def login():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
+        # 登录失败限流：同一 IP+账号 10 分钟内最多失败 5 次，防暴力破解。
+        # 只统计失败（成功不占名额），达到上限后连正确密码也暂时拒登。
+        limit_key = "login:" + _client_ip() + ":" + username
+        if _rate_check(limit_key, max_hits=5, window_seconds=600):
+            flash("登录尝试次数过多，请 10 分钟后再试。", "error")
+            return render_template("login.html")
         user = config.USERS.get(username)
         if user and password == user["password"]:
             session["logged_in"] = True
@@ -231,6 +260,7 @@ def login():
             session["username"] = username
             nxt = session.pop("next_url", None)
             return redirect(nxt or url_for("index"))
+        _rate_record(limit_key)
         flash("账号或密码错误，请重试。", "error")
     return render_template("login.html")
 
@@ -305,6 +335,32 @@ def save_photo(file_storage):
     fname = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
     file_storage.save(os.path.join(config.UPLOAD_FOLDER, fname))
     return fname
+
+
+def save_base64_photo(raw, prefix):
+    """把 data:image base64 字符串保存成照片文件，返回文件名。
+
+    对非法输入（非 data:image、缺逗号、base64 解码失败、空内容）
+    一律返回 None 而不是抛异常——照片是可选字段，不能因为它让整单 500。
+    """
+    import base64 as _b64
+    import binascii
+    if not raw or not isinstance(raw, str):
+        return None
+    if not raw.startswith("data:image") or "," not in raw:
+        return None
+    try:
+        header, b64 = raw.split(",", 1)
+        ext = "png" if "png" in header else "jpeg"
+        data = _b64.b64decode(b64, validate=True)
+        if not data:
+            return None
+        fname = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
+        with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
+            f.write(data)
+        return fname
+    except (ValueError, binascii.Error, OSError):
+        return None
 
 
 def parse_dt(s):
@@ -476,18 +532,13 @@ def public_report():
             lost_location = request.form.get("lost_location_other", "").strip()
         lost_time = request.form.get("lost_time", "").strip()
 
-        # 处理报失照片（复用拍照/上传逻辑，但存同目录，仅管理员可见）
+        # 处理报失照片（复用拍照/上传逻辑，但存同目录，仅管理员可见；
+        # 非法 base64 安全忽略，不能让坏图把整单报失打成 500）
         photo_path = None
         photo_data = request.form.get("photo_data")
         file = request.files.get("photo_file")
         if photo_data and photo_data.startswith("data:image"):
-            import base64
-            header, b64 = photo_data.split(",", 1)
-            ext = "png" if "png" in header else "jpeg"
-            fname = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
-            with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
-                f.write(base64.b64decode(b64))
-            photo_path = fname
+            photo_path = save_base64_photo(photo_data, "report")
         elif file and file.filename and allowed_photo(file.filename):
             ext = file.filename.rsplit(".", 1)[1].lower()
             fname = f"report_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
@@ -687,17 +738,20 @@ def report_found_claim(report_id):
     else:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 认领人照片（base64，可选）
-    claimer_photo = None
-    cp_data = request.form.get("claimer_photo_data", "")
-    if cp_data and cp_data.startswith("data:image"):
-        import base64 as _b64
-        header, b64 = cp_data.split(",", 1)
-        ext = "png" if "png" in header else "jpeg"
-        fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
-        with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
-            f.write(_b64.b64decode(b64))
-        claimer_photo = fname
+    # 原子抢占报失记录：并发双击/重复提交只有一个线程能继续，
+    # 失败者直接收到“已处理”。先占位成功，后续失败再回滚状态。
+    cur = db.execute(
+        """UPDATE lost_reports SET status='已找到', handled_by=?, handled_at=?, note=?
+           WHERE id=? AND status='待查找'""",
+        (operator, now, "处理中…", report_id)
+    )
+    if cur.rowcount == 0:
+        return jsonify({"ok": False, "msg": "该报失已处理。"})
+    db.commit()
+
+    # 认领人照片（base64，可选；非法输入安全忽略）
+    claimer_photo = save_base64_photo(
+        request.form.get("claimer_photo_data", ""), "claimer")
 
     # 生成物品（患者报失 + 直接已认领）；编号撞唯一约束自动换号重试
     def do_insert(code, created_at):
@@ -717,12 +771,17 @@ def report_found_claim(report_id):
 
     code, new_item_id = _insert_item_with_retry(db, do_insert)
     if new_item_id is None:
+        # 占位回滚：把报失状态还给待查找，方便重试
+        db.execute(
+            "UPDATE lost_reports SET status='待查找', note=NULL WHERE id=?",
+            (report_id,),
+        )
+        db.commit()
         return jsonify({"ok": False, "msg": "编号生成冲突过多，请重试。"})
-    # 报失标记已找到
+    # 回填关联物品编号
     db.execute(
-        """UPDATE lost_reports SET status='已找到', handled_by=?, handled_at=?,
-           matched_item_id=?, note=? WHERE id=?""",
-        (operator, now, new_item_id, f"已找到并认领，编号{code}", report_id)
+        """UPDATE lost_reports SET matched_item_id=?, note=? WHERE id=?""",
+        (new_item_id, f"已找到并认领，编号{code}", report_id)
     )
     db.commit()
     return jsonify({"ok": True, "msg": f"已找到并认领完成，编号 {code}（患者报失）。"})
@@ -840,7 +899,6 @@ def register():
             return redirect(url_for("register"))
 
         # 处理照片（支持多张，最终存逗号分隔的文件名）
-        import base64 as _b64
         photo_files = []  # 收集所有保存成功的文件名
 
         # 1) 本地上传的文件（可多选）
@@ -851,15 +909,10 @@ def register():
         raw_photos = request.form.get("photo_data", "")
         if raw_photos:
             # 按逗号拆分多个 data:image（注意 base64 内部无逗号，split(',') 会破坏，
-            # 所以前端用特殊分隔符 ||| 分隔多张）
+            # 所以前端用特殊分隔符 ||| 分隔多张）；非法 base64 的单张丢弃，不拖垮整单
             for one in raw_photos.split("|||"):
-                one = one.strip()
-                if one.startswith("data:image"):
-                    header, b64 = one.split(",", 1)
-                    ext = "png" if "png" in header else "jpeg"
-                    fname = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
-                    with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
-                        f.write(_b64.b64decode(b64))
+                fname = save_base64_photo(one.strip(), "photo")
+                if fname:
                     photo_files.append(fname)
         photo_path = ",".join(photo_files) if photo_files else None
 
@@ -971,18 +1024,12 @@ def claim():
             if _is_ajax(): return jsonify({"ok": False, "msg": msg})
             flash(msg, "error"); return redirect(url_for("claim", code=item["code"]))
 
-        # 处理认领人照片（可选，给老人等记不清电话的留照备查）
+        # 认领人照片（可选，给老人等记不清电话的留照备查）
         claimer_photo = None
         cp_data = request.form.get("claimer_photo_data")    # 拍照 base64
         cp_file = request.files.get("claimer_photo_file")   # 文件上传
         if cp_data and cp_data.startswith("data:image"):
-            import base64 as _b64
-            header, b64 = cp_data.split(",", 1)
-            ext = "png" if "png" in header else "jpeg"
-            fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
-            with open(os.path.join(config.UPLOAD_FOLDER, fname), "wb") as f:
-                f.write(_b64.b64decode(b64))
-            claimer_photo = fname
+            claimer_photo = save_base64_photo(cp_data, "claimer")
         elif cp_file and cp_file.filename and allowed_photo(cp_file.filename):
             ext = cp_file.filename.rsplit(".", 1)[1].lower()
             fname = f"claimer_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}.{ext}"
@@ -996,13 +1043,19 @@ def claim():
             now = dt.strftime("%Y-%m-%d %H:%M:%S") if dt else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        db.execute(
+        # 原子认领：UPDATE 带 status='待认领' 条件，并发提交只有一个能命中，
+        # 其余返回“已被认领”——不能用先查再改（check-then-act）的写法。
+        cur = db.execute(
             """UPDATE items SET status='已认领', claimer_name=?, claimer_phone=?,
                feature_verified=?, claimed_at=?, operator=?, claimer_photo=?,
-               claimer_group=?, claimer_gender=? WHERE id=?""",
+               claimer_group=?, claimer_gender=? WHERE id=? AND status='待认领'""",
             (claimer_name, claimer_phone, feature_verified, now, operator,
              claimer_photo, claimer_group or None, claimer_gender or None, item_id)
         )
+        if cur.rowcount == 0:
+            msg = "该物品刚被其他人认领，请刷新确认。"
+            if _is_ajax(): return jsonify({"ok": False, "msg": msg})
+            flash(msg, "error"); return redirect(url_for("claim"))
         db.commit()
         msg = f"认领登记完成：{item['code']} 已归还给 {claimer_name}"
         # AJAX 提交（工作台抽屉）：返回 JSON

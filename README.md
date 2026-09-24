@@ -120,10 +120,10 @@ http://服务器IP:8000
 /usr/bin/python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest
 npm install && npx playwright install chromium
 
-# 后端测试（接口、权限、隐私、登记/认领业务流，约 30 项）
+# 后端测试（接口、权限、隐私、登记/认领业务流、并发与安全）
 ./.venv/bin/python -m pytest
 
-# E2E 测试（真实浏览器走 登录→登记→认领 全链路，约 10 项）
+# E2E 测试（真实浏览器走 登录→登记→认领→报失查询 全链路）
 npx playwright test
 npx playwright test --ui      # 可视化调试
 npx playwright show-report    # 查看 HTML 报告
