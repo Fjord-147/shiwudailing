@@ -138,24 +138,29 @@ def init_db():
             registered_by TEXT                     -- 登记人（操作的导医，自动记录）
         )
     """)
-    # 兼容旧库：若表已存在但缺字段，自动补上
+    # 兼容旧库：若表已存在但缺字段，自动补上。
+    # 注意：gunicorn 多 worker 并发启动时，可能两个进程同时补同一列，
+    # 撞「duplicate column」是正常竞争结果，忽略即可（剩下的列下次启动补齐）。
     cols = [r[1] for r in conn.execute("PRAGMA table_info(items)").fetchall()]
-    if "hide_photo" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN hide_photo INTEGER DEFAULT 0")
-    if "claimer_photo" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN claimer_photo TEXT")
-    if "claimer_group" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN claimer_group TEXT")
-    if "claimer_gender" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN claimer_gender TEXT")
-    if "storage_location" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN storage_location TEXT")
-    if "hidden_photos" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN hidden_photos TEXT")
-    if "source" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN source TEXT")
-    if "registered_by" not in cols:
-        conn.execute("ALTER TABLE items ADD COLUMN registered_by TEXT")
+    try:
+        if "hide_photo" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN hide_photo INTEGER DEFAULT 0")
+        if "claimer_photo" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN claimer_photo TEXT")
+        if "claimer_group" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN claimer_group TEXT")
+        if "claimer_gender" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN claimer_gender TEXT")
+        if "storage_location" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN storage_location TEXT")
+        if "hidden_photos" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN hidden_photos TEXT")
+        if "source" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN source TEXT")
+        if "registered_by" not in cols:
+            conn.execute("ALTER TABLE items ADD COLUMN registered_by TEXT")
+    except sqlite3.OperationalError:
+        pass  # 并发补列竞争，忽略；缺列会在下次启动补齐
 
     # 报失表（公众提交的"我丢了什么"）
     conn.execute("""
@@ -1325,8 +1330,12 @@ def serve_upload(filename):
 # ============================================================
 # 启动
 # ============================================================
+# 模块导入时即建表：gunicorn 等 WSGI 服务器只 import app 模块、
+# 永远不执行 __main__，建表不能只放在 __main__ 里（否则首个查库请求 500）。
+# init_db 是幂等的（CREATE TABLE IF NOT EXISTS + 缺列才 ALTER），重复调用安全。
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     print("=" * 50)
     print("  和康中医医院失物招领系统 已启动")
     print(f"  本机访问：  http://127.0.0.1:{config.PORT}")
