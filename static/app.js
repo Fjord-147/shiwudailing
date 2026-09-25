@@ -91,6 +91,12 @@ function escapeHtml(s){
                     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ===== 时间显示格式化：datetime-local 原样存的 '2026-09-25T17:33' → '2026-09-25 17:33' ===== */
+function fmtDT(s){
+    if(s==null) return '';
+    return String(s).replace('T',' ');
+}
+
 /* ===== 消息提示（轻量，替代 alert）===== */
 function toast(msg, type) {
     type = type || "info";

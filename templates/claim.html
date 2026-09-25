@@ -36,7 +36,7 @@
     <div class="detail-grid">
         <div><span class="k">类别：</span><span class="v">{{ target_item.category or '—' }}</span></div>
         <div><span class="k">捡到地点：</span><span class="v">{{ target_item.found_location or '—' }}</span></div>
-        <div><span class="k">捡到时间：</span><span class="v">{{ target_item.found_time or '—' }}</span></div>
+        <div><span class="k">捡到时间：</span><span class="v">{{ target_item.found_time|dt or '—' }}</span></div>
         <div><span class="k">捡到人：</span><span class="v">{{ target_item.founder or '—' }}</span></div>
         <div style="grid-column:1/-1;"><span class="k">特征描述（请与失主核对）：</span><br>
             <span class="v" style="font-size:16px;font-weight:600;color:#c62828;">
@@ -112,7 +112,7 @@
             <div class="info">
                 <div class="code">编号 {{ it.code }}</div>
                 <div class="name">{{ it.name }}</div>
-                <div class="meta">{{ it.category or '未分类' }} · {{ it.found_location or '—' }} · {{ it.found_time or '' }}</div>
+                <div class="meta">{{ it.category or '未分类' }} · {{ it.found_location or '—' }} · {{ it.found_time|dt or '' }}</div>
             </div>
             <div class="actions">
                 <a href="{{ url_for('claim', code=it.code) }}" class="btn btn-success btn-sm">认领</a>

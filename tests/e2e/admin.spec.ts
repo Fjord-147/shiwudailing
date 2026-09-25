@@ -13,7 +13,7 @@ const TEST_PNG = Buffer.from(
 async function registerItem(
   page: Page,
   name: string,
-  opts: { category?: string; withPhoto?: boolean } = {}
+  opts: { category?: string; withPhoto?: boolean; foundTime?: string } = {}
 ): Promise<string> {
   const category = opts.category ?? '水杯/雨伞';
   await page.goto('/register');
@@ -21,6 +21,9 @@ async function registerItem(
   await page.selectOption('select[name="category"]', { label: category });
   await page.fill('input[name="storage_location"]', '导诊台1号抽屉');
   await page.fill('textarea[name="description"]', 'E2E 自动登记');
+  if (opts.foundTime) {
+    await page.fill('input[name="found_time"]', opts.foundTime);
+  }
   if (opts.withPhoto) {
     // 切到「上传图片」页签再传文件
     await page.click('button[data-tab="upload"][data-tab-group="photo"]');
@@ -171,5 +174,27 @@ test.describe('管理员后台', () => {
     // 5. 工作台等其他管理页也不执行
     await page.goto('/admin');
     expect(await page.evaluate(() => (window as any).__xss)).toBeUndefined();
+  });
+
+  test('时间显示：found_time 的 T 换成空格（表格+卡片视图）', async ({ page }) => {
+    await loginAsAdmin(page);
+    const code = await registerItem(page, 'E2E时间格式', { foundTime: '2026-09-25T17:33' });
+
+    // 表格视图（Jinja 渲染）
+    await page.goto('/list');
+    const row = page.locator('tr', { hasText: code });
+    await expect(row).toContainText('2026-09-25 17:33');
+    await expect(row).not.toContainText('2026-09-25T17:33');
+
+    // 卡片视图（JS innerHTML 渲染）
+    await page.click('#viewCardBtn');
+    const card = page.locator('.lv-card', { hasText: code });
+    await expect(card).toContainText('2026-09-25 17:33');
+    await expect(card).not.toContainText('2026-09-25T17:33');
+
+    // 工作台待认领卡片（Jinja + JS 两处渲染）
+    await page.goto('/admin');
+    const dashCard = page.locator('.item-row, .card-grid > *', { hasText: code }).first();
+    await expect(dashCard).toContainText('2026-09-25 17:33');
   });
 });

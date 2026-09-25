@@ -245,6 +245,15 @@ def inject_globals():
     }
 
 
+@app.template_filter("dt")
+def _fmt_dt(val):
+    """时间显示：found_time/lost_time 原样存的是 datetime-local 格式
+    （2026-09-25T17:33），模板输出时把 T 换成空格。空值原样返回。"""
+    if not val:
+        return val
+    return str(val).replace("T", " ")
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     # 已登录再访问登录页：直接回工作台（和后台其它页面的会话恢复保持一致）

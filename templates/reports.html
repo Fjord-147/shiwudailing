@@ -53,7 +53,7 @@
             <div class="report-detail">
                 <div><span class="k">失主：</span>{{ r.owner_name }}　<span class="k">电话：</span>{{ r.owner_phone }}</div>
                 <div><span class="k">类别：</span>{{ r.item_category or '—' }}　<span class="k">丢失地点：</span>{{ r.lost_location or '—' }}</div>
-                <div><span class="k">丢失时间：</span>{{ r.lost_time or '—' }}</div>
+                <div><span class="k">丢失时间：</span>{{ r.lost_time|dt or '—' }}</div>
                 {% if r.description %}
                 <div><span class="k">特征：</span>{{ r.description }}</div>
                 {% endif %}

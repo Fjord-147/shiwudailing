@@ -39,10 +39,10 @@
     <button class="btn btn-success" onclick="openDrawer('claim')">🔍 认领登记</button>
     <a href="{{ url_for('item_list') }}" class="btn btn-secondary">📋 查看全部</a>
     <a href="{{ url_for('reports') }}" class="btn btn-secondary">📬 报失处理</a>
-    <div style="display:flex;gap:6px;margin-left:auto;">
-        <input type="text" id="dashSearch" class="form-control" placeholder="搜索失物编号/名称/特征..." style="min-width:240px;" oninput="dashSearchTimer()" onkeydown="if(event.key==='Enter'){event.preventDefault();dashSearch();}">
-        <button class="btn btn-secondary" onclick="dashSearch()">🔍 搜索</button>
-        <button class="btn btn-secondary btn-sm" onclick="clearDashSearch()" title="清除搜索">×</button>
+    <div style="display:flex;gap:6px;margin-left:auto;flex-wrap:nowrap;align-items:center;flex-shrink:1;min-width:0;">
+        <input type="text" id="dashSearch" class="form-control" placeholder="搜索失物编号/名称/特征..." style="min-width:0;flex:1;" oninput="dashSearchTimer()" onkeydown="if(event.key==='Enter'){event.preventDefault();dashSearch();}">
+        <button class="btn btn-secondary" style="flex-shrink:0;white-space:nowrap;" onclick="dashSearch()">🔍 搜索</button>
+        <button class="btn btn-secondary btn-sm" style="flex-shrink:0;" onclick="clearDashSearch()" title="清除搜索">×</button>
     </div>
 </div>
 
@@ -187,7 +187,7 @@
                 <div class="meta">
                     {{ it.category or '未分类' }} ·
                     {{ it.found_location or '地点未填' }} ·
-                    捡到 {{ it.found_time or it.created_at[:10] }}
+                    捡到 {{ it.found_time|dt or it.created_at[:10] }}
                 </div>
             </div>
             <div class="actions">
@@ -315,7 +315,7 @@ function dashSearch(){
                     photo+
                     '<div class="info"><div class="code">编号 '+it.code+'</div>'+
                     '<div class="name">'+escapeHtml(it.name)+'　'+statusTag+'</div>'+
-                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'—')+' · '+escapeHtml(it.found_time||'')+'</div></div>'+
+                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'—')+' · '+escapeHtml(fmtDT(it.found_time))+'</div></div>'+
                     '<div class="actions">'+actionBtn+'</div>'+
                     '</div>';
             });
@@ -395,7 +395,7 @@ function refreshPending(){
                     photo+
                     '<div class="info"><div class="code">编号 '+it.code+'</div>'+
                     '<div class="name">'+escapeHtml(it.name)+'　<span class="tag tag-pending">待认领</span></div>'+
-                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'地点未填')+' · 捡到 '+(it.found_time||(it.created_at||'').slice(0,10))+'</div></div>'+
+                    '<div class="meta">'+escapeHtml(it.category||'未分类')+' · '+escapeHtml(it.found_location||'地点未填')+' · 捡到 '+(it.found_time?fmtDT(it.found_time):(it.created_at||'').slice(0,10))+'</div></div>'+
                     '<div class="actions"><button class="btn btn-success btn-sm" onclick="event.stopPropagation();openClaimForCode(\''+it.code+'\')">去认领</button></div>'+
                     '</div>';
             });
@@ -446,7 +446,7 @@ function viewItemDetail(id){
                 '<div class="detail-grid">'+
                 '<div><span class="k">类别：</span><span class="v">'+escapeHtml(it.category||'—')+'</span></div>'+
                 '<div><span class="k">捡到地点：</span><span class="v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
-                '<div><span class="k">捡到时间：</span><span class="v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
+                '<div><span class="k">捡到时间：</span><span class="v">'+escapeHtml(fmtDT(it.found_time)||'—')+'</span></div>'+
                 '<div><span class="k">捡到人：</span><span class="v">'+escapeHtml(it.founder||'—')+'</span></div>'+
                 '<div style="grid-column:1/-1;"><span class="k">特征描述：</span><br><span class="v">'+escapeHtml(it.description||'—')+'</span></div>'+
                 '</div></div>';

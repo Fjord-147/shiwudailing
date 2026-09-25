@@ -76,7 +76,7 @@
                     <td>{{ it.name }}</td>
                     <td>{{ it.category or '—' }}</td>
                     <td>{{ it.found_location or '—' }}</td>
-                    <td>{{ it.found_time or '—' }}</td>
+                    <td>{{ it.found_time|dt or '—' }}</td>
                     <td>
                         {% if it.status == '已认领' %}
                             <span class="tag tag-returned">已认领</span>
@@ -232,7 +232,7 @@ function renderCards(items){
                     '<div><span class="lv-k">类别：</span><span class="lv-v">'+st.icon+' '+escapeHtml(it.category||'未分类')+'</span></div>'+
                     '<div><span class="lv-k">捡到地点：</span><span class="lv-v">'+escapeHtml(it.found_location||'—')+'</span></div>'+
                     '<div><span class="lv-k">存放位置：</span><span class="lv-v">'+escapeHtml(it.storage_location||'—')+'</span></div>'+
-                    '<div><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(it.found_time||'—')+'</span></div>'+
+                    '<div><span class="lv-k">捡到时间：</span><span class="lv-v">'+escapeHtml(fmtDT(it.found_time)||'—')+'</span></div>'+
                     '<div><span class="lv-k">登记时间：</span><span class="lv-v">'+escapeHtml(it.created_at||'—')+'</span></div>'+
                     '<div><span class="lv-k">捡到人：</span><span class="lv-v">'+escapeHtml(it.founder||'—')+'</span></div>'+
                     '<div style="grid-column:1/-1;"><span class="lv-k">特征描述：</span><br><span class="lv-v">'+escapeHtml(it.description||'—')+'</span></div>'+
